@@ -19,9 +19,14 @@ export interface EffortLevel {
  * first tab holds the whole catalog and Favorites pins the ones in use; later
  * providers arrive as more entries here, not as a new popup.
  */
+/**
+ * Tabs of the model popup, in Fountible's shape: a vertical icon rail with
+ * Favorites first, then one entry per provider. Later providers arrive as
+ * more entries here, not as a new popup.
+ */
 export const MODEL_TABS = [
-  { id: 'opencode', label: 'OpenCode' },
   { id: 'favorites', label: 'Favorites' },
+  { id: 'opencode', label: 'OpenCode' },
 ] as const
 
 export type ModelTab = (typeof MODEL_TABS)[number]['id']
@@ -75,8 +80,9 @@ export function ChatComposer({
   const [draft, setDraft] = useState('')
   const [open, setOpen] = useState<'models' | 'effort' | null>(null)
   const [query, setQuery] = useState('')
-  const [tab, setTab] = useState<ModelTab>('opencode')
   const [favorites, setFavorites] = useState<Set<string>>(loadFavoriteModels)
+  // Favorites first when there is something starred, otherwise the provider.
+  const [tab, setTab] = useState<ModelTab>(() => (loadFavoriteModels().size > 0 ? 'favorites' : 'opencode'))
   const [copied, setCopied] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const current = models.find((entry) => entry.value === model) ?? null
@@ -137,7 +143,39 @@ export function ChatComposer({
   return (
     <div ref={rootRef} className="relative shrink-0 px-3 pb-3">
       {open === 'models' ? (
-        <div className="absolute inset-x-3 bottom-full z-50 mb-2 flex max-h-72 flex-col overflow-hidden rounded-xl border border-line bg-popover text-foreground shadow-panel-lg">
+        <div className="absolute inset-x-3 bottom-full z-50 mb-2 flex max-h-72 flex-row overflow-hidden rounded-xl border border-line bg-popover text-foreground shadow-panel-lg">
+          {query.trim().length === 0 ? (
+            <nav aria-label="Model sources" className="flex w-11 shrink-0 flex-col items-center gap-1 border-e border-line py-2">
+              {MODEL_TABS.map((entry) => {
+                const selected = entry.id === tab
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    role="tab"
+                    aria-label={entry.label}
+                    aria-selected={selected}
+                    aria-pressed={selected}
+                    title={entry.label}
+                    onClick={() => setTab(entry.id)}
+                    className={cn(
+                      'flex size-8 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                      selected
+                        ? 'bg-cx-accent/15 text-cx-accent'
+                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    {entry.id === 'favorites' ? (
+                      <StarIcon className={cn('size-4', selected && 'fill-current')} />
+                    ) : (
+                      <OpenCodeLogo className="size-4" />
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+          ) : null}
+          <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
             <SearchIcon className="size-3.5 shrink-0 text-muted-foreground" />
             <input
@@ -147,26 +185,6 @@ export function ChatComposer({
               onChange={(event) => setQuery(event.target.value)}
               className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
             />
-          </div>
-          <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 py-1" role="tablist" aria-label="Model sources">
-            {MODEL_TABS.map((entry) => {
-              const selected = entry.id === tab
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setTab(entry.id)}
-                  className={cn(
-                    'rounded-md px-2 py-1 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
-                    selected ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {entry.label}
-                </button>
-              )
-            })}
           </div>
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto py-1" role="listbox" aria-label="Models">
             {visible.map((entry) => {
@@ -189,7 +207,7 @@ export function ChatComposer({
                       setOpen(null)
                     }
                   }}
-                  className="flex min-w-0 cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
+                  className="group flex min-w-0 cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
                 >
                   {modelLogo()}
                   <span className="min-w-0 flex-1">
@@ -198,16 +216,23 @@ export function ChatComposer({
                   </span>
                   <button
                     type="button"
+                    tabIndex={-1}
                     aria-label={starred ? `Unstar ${entry.name}` : `Star ${entry.name}`}
                     aria-pressed={starred}
                     title={starred ? 'Remove from Favorites' : 'Add to Favorites'}
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }}
                     onClick={(event) => {
                       event.stopPropagation()
                       toggleFavorite(entry.value)
                     }}
                     className={cn(
-                      'grid size-6 shrink-0 place-items-center rounded-md outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring',
-                      starred ? 'text-cx-accent' : 'text-muted-foreground hover:text-foreground',
+                      'grid size-6 shrink-0 place-items-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                      starred
+                        ? 'text-cx-accent'
+                        : 'text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100',
                     )}
                   >
                     <StarIcon className={cn('size-3.5', starred && 'fill-current')} />
@@ -217,10 +242,8 @@ export function ChatComposer({
               )
             })}
             {visible.length === 0 ? (
-              <p className="px-3 py-4 text-xs text-muted-foreground">
-                {tab === 'favorites' && !query.trim()
-                  ? 'No favorites yet. Star a model to pin it here.'
-                  : 'No models match.'}
+              <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                {tab === 'favorites' && !query.trim() ? 'No favorites yet — star a model.' : 'No models found'}
               </p>
             ) : null}
           </div>
@@ -232,6 +255,7 @@ export function ChatComposer({
             {copied ? 'Copied — run it in your terminal' : 'Connect another AI'}
           </button>
           <span className="sr-only">Run opencode auth login to sign in</span>
+          </div>
         </div>
       ) : null}
       {open === 'effort' ? (

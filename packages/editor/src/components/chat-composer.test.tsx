@@ -69,12 +69,13 @@ describe('ChatComposer', () => {
     expect(onEffort).toHaveBeenCalledWith('high')
   })
 
-  test('shows OpenCode and Favorites tabs over the catalog', () => {
+  test('shows a vertical icon rail with OpenCode and Favorites tabs', () => {
     composer()
     fireEvent.click(screen.getByRole('button', { name: 'Model' }))
-    const tabs = screen.getByRole('tablist', { name: 'Model sources' })
-    expect(tabs.textContent).toMatch('OpenCode')
-    expect(tabs.textContent).toMatch('Favorites')
+    const rail = screen.getByRole('navigation', { name: 'Model sources' })
+    expect(rail.className).toMatch('flex-col')
+    expect(screen.getByRole('tab', { name: 'OpenCode' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Favorites' })).toBeTruthy()
     // The OpenCode tab lists the whole catalog.
     expect(screen.getByRole('option', { name: /Grok 4\.7/ })).toBeTruthy()
     expect(screen.getByRole('option', { name: /V4 Pro/ })).toBeTruthy()
@@ -90,14 +91,14 @@ describe('ChatComposer', () => {
     // Unstarred models stay out even when searching.
     fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'grok' } })
     expect(screen.queryByRole('option', { name: /Grok/ })).toBeNull()
-    expect(screen.getByText('No models match.')).toBeTruthy()
+    expect(screen.getByText('No models found')).toBeTruthy()
   })
 
   test('starts the Favorites tab empty with a starring hint', () => {
     composer()
     fireEvent.click(screen.getByRole('button', { name: 'Model' }))
     fireEvent.click(screen.getByRole('tab', { name: 'Favorites' }))
-    expect(screen.getByText(/Star a model to pin it here/)).toBeTruthy()
+    expect(screen.getByText(/star a model/)).toBeTruthy()
   })
 
   test('sends on Enter and offers the connect command', () => {
