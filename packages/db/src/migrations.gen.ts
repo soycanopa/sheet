@@ -22,5 +22,11 @@ export const migrations: ReadonlyArray<{
     "when": 1791480667771,
     "breakpoints": true,
     "sql": "CREATE TABLE `design_comment` (\n\t`id` text NOT NULL,\n\t`design_id` text NOT NULL,\n\t`user_id` text NOT NULL,\n\t`node_id` text NOT NULL,\n\t`node_label` text NOT NULL,\n\t`body` text NOT NULL,\n\t`author` text DEFAULT 'user' NOT NULL,\n\t`resolved_at` integer,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL,\n\tPRIMARY KEY(`id`, `user_id`),\n\tFOREIGN KEY (`design_id`,`user_id`) REFERENCES `design`(`id`,`user_id`) ON UPDATE no action ON DELETE cascade\n);\n--> statement-breakpoint\nCREATE INDEX `design_comment_design_idx` ON `design_comment` (`user_id`,`design_id`,`node_id`,`created_at`);"
+  },
+  {
+    "tag": "0003_jittery_energizer",
+    "when": 1793933634947,
+    "breakpoints": true,
+    "sql": "ALTER TABLE `user_preferences` ADD `chat_enabled` integer DEFAULT false NOT NULL;--> statement-breakpoint\nALTER TABLE `user_preferences` ADD `chat_provider` text DEFAULT 'opencode' NOT NULL;"
   }
 ]
