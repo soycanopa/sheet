@@ -164,6 +164,7 @@
         "@sheet/canvas": "workspace:*",
         "@sheet/db": "workspace:*",
         "@sheet/platform": "workspace:*",
+        "@sheet/realtime": "workspace:*",
         "drizzle-orm": "catalog:",
         "playwright-core": "^1.61.1",
         "zod": "catalog:",

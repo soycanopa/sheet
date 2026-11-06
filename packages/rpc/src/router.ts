@@ -39,11 +39,29 @@ import {
   resolveComment,
 } from './comments'
 import { getPreferences, savePreferences } from './preferences'
+import {
+  cancelChat,
+  closeChat,
+  getChatHistory,
+  getChatStatus,
+  listChatModels,
+  sendChat,
+  startChat,
+} from './chat/procedures'
 
 export type { ORPCContext } from './procedures'
 
 export const appRouter = {
   preferences: { get: getPreferences, save: savePreferences },
+  chat: {
+    status: getChatStatus,
+    models: listChatModels,
+    start: startChat,
+    send: sendChat,
+    cancel: cancelChat,
+    history: getChatHistory,
+    close: closeChat,
+  },
   design: {
     list: listDesigns,
     listArchived: listArchivedDesigns,

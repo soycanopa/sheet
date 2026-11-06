@@ -8,6 +8,15 @@ import {
   parseVersion,
   standaloneCandidates,
 } from './opencode-locate'
+import {
+  CHAT_EFFORT_LEVELS,
+  chatEffortCandidates,
+  chatSourceName,
+  chatToolTail,
+  isChatReadOnlyTool,
+  sheetChatConfig,
+  summarizeChatModels,
+} from './opencode'
 
 describe('opencode version gate', () => {
   test('parses dotted versions out of surrounding text', () => {
@@ -75,5 +84,66 @@ describe('acp framing', () => {
     const { lines, rest } = splitLines('{"a":1}\n{"b":', '2}\n{"c":3}')
     expect(lines).toEqual(['{"a":1}', '{"b":2}'])
     expect(rest).toBe('{"c":3}')
+  })
+})
+
+describe('chat lockdown', () => {
+  test('asks everything except the sheet tools', () => {
+    const config = sheetChatConfig() as {
+      agents: { sheet: { permissions: { action: string; effect: string }[] } }
+      default_agent: string
+      share: string
+    }
+    expect(config.default_agent).toBe('sheet')
+    expect(config.share).toBe('disabled')
+    expect(config.agents.sheet.permissions).toEqual([
+      { action: '*', resource: '*', effect: 'ask' },
+      { action: 'sheet_*', resource: '*', effect: 'allow' },
+    ])
+  })
+
+  test('matches MCP tool names on the trailing segment', () => {
+    expect(chatToolTail('sheet_listDesigns')).toBe('listDesigns')
+    expect(chatToolTail('mcp__sheet__getWebDocument')).toBe('getWebDocument')
+    expect(isChatReadOnlyTool('sheet_listDesigns')).toBe(true)
+    expect(isChatReadOnlyTool('sheet_applyWebTransaction')).toBe(false)
+    expect(isChatReadOnlyTool('shell')).toBe(false)
+  })
+})
+
+describe('chat effort', () => {
+  test('offers the Fountible scale and maps it onto OpenCode values', () => {
+    expect(CHAT_EFFORT_LEVELS.map((level) => level.value)).toEqual([
+      'auto',
+      'off',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+    ])
+    expect(chatEffortCandidates('auto')).toEqual([])
+    expect(chatEffortCandidates('low')).toEqual(['low', 'minimal'])
+    expect(chatEffortCandidates('medium')).toEqual(['medium'])
+    expect(chatEffortCandidates('xhigh')).toEqual(['xhigh', 'max', 'high'])
+  })
+})
+
+describe('chat model catalog', () => {
+  test('names runnable models from the catalog', () => {
+    const models = summarizeChatModels(
+      'deepseek/deepseek-flash\nnot-a-model\nxai/grok-4.5\n',
+      JSON.stringify({ data: [{ providerID: 'xai', id: 'grok-4.5', name: 'Grok 4.5' }] }),
+    )
+    expect(models).toEqual([
+      { id: 'deepseek/deepseek-flash', name: 'deepseek-flash', source: 'DeepSeek' },
+      { id: 'xai/grok-4.5', name: 'Grok 4.5', source: 'xAI' },
+    ])
+  })
+
+  test('falls back to ids and title-cases unknown providers', () => {
+    expect(chatSourceName('deepseek')).toBe('DeepSeek')
+    expect(chatSourceName('my-cloud')).toBe('My Cloud')
+    expect(summarizeChatModels('oops', 'nope')).toEqual([])
   })
 })
