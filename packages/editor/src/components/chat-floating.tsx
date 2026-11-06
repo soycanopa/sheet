@@ -239,7 +239,7 @@ export function ChatFloating({
             {current ? (
               <div
                 key={current.id}
-                className="group flex items-start gap-1 rounded-md bg-secondary px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex items-center gap-1 rounded-md bg-secondary px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <button
                   type="button"
@@ -271,7 +271,7 @@ export function ChatFloating({
             {older.map((session) => (
               <div
                 key={session.id}
-                className="group flex items-start gap-1 rounded-md px-2 py-1.5 outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex items-center gap-1 rounded-md px-2 py-1.5 outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <button
                   type="button"
