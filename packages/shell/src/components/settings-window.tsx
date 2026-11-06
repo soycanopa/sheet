@@ -9,6 +9,7 @@ import {
 } from '@sheet/editor/lib/shortcuts'
 import { cn } from '@sheet/ui/utils'
 import { AppearanceSettings, SoundSettings } from './appearance-settings'
+import { InternalChatSettings } from './chat-settings'
 import { GeneralSettings } from './general-settings'
 import { ShortcutsSettings } from './shortcuts-settings'
 import { UpdatesSettings } from './updates-settings'
@@ -112,7 +113,12 @@ function Body({ section }: { section: SectionId }): ReactNode {
     case 'shortcuts':
       return <ShortcutsSection />
     case 'agents':
-      return <ConnectAgent />
+      return (
+        <div className="flex flex-col gap-4 sm:gap-5">
+          <InternalChatSettings />
+          <ConnectAgent />
+        </div>
+      )
     case 'updates':
       return <UpdatesSettings />
   }
