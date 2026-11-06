@@ -3021,7 +3021,7 @@ export function WebCanvasEditor({
     if (event.button !== 0 || tool !== 'select' || isSpacePanning) return
     const target = event.target
     if (!(target instanceof Element)) return
-    if (target.closest('button, [role="toolbar"], input, select, textarea, [contenteditable="true"]')) return
+    if (target.closest('button, [role="toolbar"], [data-chat-floating], input, select, textarea, [contenteditable="true"]')) return
     const id = pickTarget(documentRef.current, webNodeIdFromElement(target))
     if (!id || boundNodeIndex(documentRef.current.instances).has(id)) return
     const element = findElement(id)
@@ -3415,7 +3415,7 @@ export function WebCanvasEditor({
 
   const startDrawing = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || isSpacePanning || tool === 'select' || tool === 'pan' || tool === 'image' || tool === 'comment') return
-    if (event.target instanceof Element && event.target.closest('button, [role="toolbar"], input, select, textarea')) return
+    if (event.target instanceof Element && event.target.closest('button, [role="toolbar"], [data-chat-floating], input, select, textarea')) return
     const start = canvasPoint(event)
     const next: DrawingDraft = { pointerId: event.pointerId, tool, start, end: start, points: [start] }
     drawingRef.current = next
@@ -3518,7 +3518,7 @@ export function WebCanvasEditor({
 
   const startPan = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (!isPanningActive && event.button !== 1) return
-    if (event.target instanceof Element && event.target.closest('button, [role="toolbar"], input, select, textarea')) return
+    if (event.target instanceof Element && event.target.closest('button, [role="toolbar"], [data-chat-floating], input, select, textarea')) return
     event.currentTarget.setPointerCapture(event.pointerId)
     dragRef.current = {
       mode: 'pan',
@@ -4617,6 +4617,10 @@ export function WebCanvasEditor({
               <MaximizeIcon className="size-3.5" />
             </button>
           </div>
+          {/* Floating agent: anchored to the canvas stage, bottom-left beside the left panel. */}
+          {chatMode === 'floating' ? (
+            <ChatFloating designId={designId} open={chatFloatOpen} onOpenChange={setFloatOpen} />
+          ) : null}
         </main>
 
         {/* Right Inspector Panel: Design */}
@@ -4734,9 +4738,6 @@ export function WebCanvasEditor({
             </button>
           </div>
         </aside>
-        ) : null}
-        {chatMode === 'floating' ? (
-          <ChatFloating designId={designId} open={chatFloatOpen} onOpenChange={setFloatOpen} />
         ) : null}
       </div>
 
