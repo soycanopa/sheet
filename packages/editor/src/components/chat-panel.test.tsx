@@ -19,10 +19,16 @@ const { ChatPanel } = await import('./chat-panel')
 const VIEW = {
   id: 'chat-1',
   designId: 'design-1',
-  model: 'opencode/big-pickle',
-  effort: 'auto',
-  models: [{ value: 'opencode/big-pickle', name: 'opencode/Big Pickle' }],
-  efforts: [{ value: 'auto', label: 'Auto' }],
+  model: 'xai/grok-4.7',
+  effort: 'high',
+  models: [
+    { value: 'xai/grok-4.7', name: 'Grok 4.7', source: 'xAI' },
+    { value: 'deepseek/deepseek-flash', name: 'DeepSeek V4.1 Flash 1017', source: 'DeepSeek' },
+  ],
+  efforts: [
+    { value: 'auto', label: 'Auto' },
+    { value: 'high', label: 'High' },
+  ],
   busy: false,
   transcript: [],
 }
@@ -39,32 +45,33 @@ describe('ChatPanel', () => {
 
   afterEach(() => cleanup())
 
-  test('points at Settings while the chat is off', async () => {
+  test('points at Settings while Duma is off', async () => {
     render(<ChatPanel designId="design-1" />)
-    expect(await screen.findByText('Internal chat is off')).toBeTruthy()
+    expect(await screen.findByText('Duma is off')).toBeTruthy()
     expect(screen.getByText(/Settings › Agents/)).toBeTruthy()
     expect(start).not.toHaveBeenCalled()
   })
 
-  test('starts a session with model and effort selectors once the chat is on', async () => {
+  test('shows the composer with model and effort pills once on', async () => {
     status.mockResolvedValue({ enabled: true, cli: { found: true, version: '2.2.5', sessions: 0 } })
     render(<ChatPanel designId="design-2" />)
-    expect(await screen.findByRole('combobox', { name: 'Model' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Effort' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Model' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Effort' })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeTruthy()
     expect(start).toHaveBeenCalledWith({ designId: 'design-2', model: undefined, effort: undefined })
   })
 
   test('sends the composer text to the session', async () => {
     status.mockResolvedValue({ enabled: true, cli: { found: true, version: '2.2.5', sessions: 0 } })
     render(<ChatPanel designId="design-3" />)
-    await screen.findByRole('combobox', { name: 'Model' })
+    await screen.findByRole('button', { name: 'Model' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'What is here?' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(send).toHaveBeenCalledWith({
       sessionId: 'chat-1',
       text: 'What is here?',
-      model: 'opencode/big-pickle',
-      effort: 'auto',
+      model: 'xai/grok-4.7',
+      effort: 'high',
     })
   })
 })

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { orpc } from '@sheet/rpc/client'
-import { SendIcon } from '@sheet/ui/icons'
 import { cn } from '@sheet/ui/utils'
-import { OpenCodeLogo } from './agent-logos'
+import { ChatComposer } from './chat-composer'
 import { subscribeCanvasChanges, type ChatDelta } from '../lib/canvas-events'
 
 interface ChatMsg {
@@ -13,7 +12,7 @@ interface ChatMsg {
 
 interface ChatSessionState {
   id: string
-  models: { value: string; name: string }[]
+  models: { value: string; name: string; source: string }[]
   model: string | null
   efforts: { value: string; label: string }[]
   effort: string
@@ -46,13 +45,11 @@ function store(key: string, value: string): void {
 }
 
 /**
- * The internal chat's thread: model and effort selectors copied from
- * Fountible's scale, a composer, and the streamed OpenCode turn. Availability
- * still belongs to the switch in Settings › Agents.
+ * Duma's thread: the streamed turn on top, Fountible's composer underneath.
+ * Availability still belongs to the switch in Settings › Agents.
  */
 export function ChatPanel({ designId, className }: { designId: string; className?: string }) {
   const [state, setState] = useState<PanelState>({ phase: 'loading' })
-  const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
@@ -165,9 +162,9 @@ export function ChatPanel({ designId, className }: { designId: string; className
     return (
       <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
         <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-2 px-4 py-8">
-          <p className="text-xs font-medium text-foreground">Internal chat is off</p>
+          <p className="text-xs font-medium text-foreground">Duma is off</p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Turn it on in Settings › Agents to work the canvas with OpenCode.
+            Turn it on in Settings › Agents to work the canvas with Duma.
           </p>
         </div>
       </div>
@@ -187,21 +184,20 @@ export function ChatPanel({ designId, className }: { designId: string; className
     )
   }
 
-  const send = () => {
-    const text = draft.trim()
-    if (!text || state.busy) return
-    setDraft('')
+  const send = (text: string) => {
+    if (state.busy) return
     const messages: ChatMsg[] = [...state.messages]
     if (state.streaming) messages.push({ role: 'agent', text: state.streaming })
     messages.push({ role: 'user', text })
     const cached = liveSessions.get(designId)
     if (cached) cached.messages = messages
+    const sessionId = state.id
     setState({ ...state, messages, streaming: '', busy: true, activity: 'Thinking' })
     void orpc.chat
-      .send({ sessionId: state.id, text, model: state.model ?? undefined, effort: state.effort })
+      .send({ sessionId, text, model: state.model ?? undefined, effort: state.effort })
       .catch((cause: unknown) => {
         const current = stateRef.current
-        if (current.phase !== 'on' || current.id !== state.id) return
+        if (current.phase !== 'on' || current.id !== sessionId) return
         const failed: ChatMsg[] = [...current.messages, { role: 'agent', text: cause instanceof Error ? cause.message : 'The turn failed.' }]
         const session = liveSessions.get(designId)
         if (session) session.messages = failed
@@ -213,48 +209,22 @@ export function ChatPanel({ designId, className }: { designId: string; className
     void orpc.chat.cancel({ sessionId: state.id }).catch(() => undefined)
   }
 
+  const setModel = (model: string | null) => {
+    if (model) store('sheet:chat-model', model)
+    const cached = liveSessions.get(designId)
+    if (cached) cached.model = model
+    setState({ ...state, model })
+  }
+
+  const setEffort = (effort: string) => {
+    store('sheet:chat-effort', effort)
+    const cached = liveSessions.get(designId)
+    if (cached) cached.effort = effort
+    setState({ ...state, effort })
+  }
+
   return (
     <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
-      <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-        <OpenCodeLogo className="size-4 shrink-0" />
-        <select
-          aria-label="Model"
-          value={state.model ?? ''}
-          disabled={state.models.length === 0}
-          onChange={(event) => {
-            const model = event.target.value || null
-            store('sheet:chat-model', event.target.value)
-            const cached = liveSessions.get(designId)
-            if (cached) cached.model = model
-            setState({ ...state, model })
-          }}
-          className="h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-xs font-medium outline-none hover:border-line focus-visible:border-ring"
-        >
-          {state.model === null ? <option value="">Default model</option> : null}
-          {state.models.map((model) => (
-            <option key={model.value} value={model.value}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Effort"
-          value={state.effort}
-          onChange={(event) => {
-            store('sheet:chat-effort', event.target.value)
-            const cached = liveSessions.get(designId)
-            if (cached) cached.effort = event.target.value
-            setState({ ...state, effort: event.target.value })
-          }}
-          className="h-7 w-24 shrink-0 rounded-md border border-transparent bg-transparent px-1 text-xs outline-none hover:border-line focus-visible:border-ring"
-        >
-          {state.efforts.map((level) => (
-            <option key={level.value} value={level.value}>
-              {level.label}
-            </option>
-          ))}
-        </select>
-      </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
         {state.messages.length === 0 && !state.streaming ? (
           <p className="text-xs leading-relaxed text-muted-foreground">
@@ -288,43 +258,17 @@ export function ChatPanel({ designId, className }: { designId: string; className
         ) : null}
         <div ref={bottomRef} />
       </div>
-      <div className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-2">
-        <input
-          aria-label="Message"
-          value={draft}
-          placeholder="Ask about this design…"
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault()
-              send()
-            }
-          }}
-          className="h-8 min-w-0 flex-1 rounded-md border border-line bg-background px-2.5 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring"
-        />
-        {state.busy ? (
-          <button
-            type="button"
-            onClick={stop}
-            className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Stop"
-            title="Stop"
-          >
-            <span className="size-3 rounded-[3px] bg-current" aria-hidden="true" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={send}
-            disabled={!draft.trim()}
-            className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-            aria-label="Send"
-            title="Send"
-          >
-            <SendIcon className="size-4" />
-          </button>
-        )}
-      </div>
+      <ChatComposer
+        models={state.models}
+        model={state.model}
+        onModel={setModel}
+        efforts={state.efforts}
+        effort={state.effort}
+        onEffort={setEffort}
+        onSend={send}
+        busy={state.busy}
+        onStop={stop}
+      />
     </div>
   )
 }
