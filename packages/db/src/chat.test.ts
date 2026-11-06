@@ -10,10 +10,35 @@ describe('chat settings', () => {
   })
 
   test('keeps an explicit opt-in', () => {
-    expect(parseChatSettings({ enabled: true, provider: 'opencode' })).toEqual({ enabled: true, provider: 'opencode' })
+    expect(parseChatSettings({ enabled: true, provider: 'opencode' })).toEqual({
+      enabled: true,
+      provider: 'opencode',
+      side: 'left',
+      mode: 'panel',
+    })
+  })
+
+  test('keeps side and mode, falling back per field', () => {
+    expect(parseChatSettings({ enabled: true, provider: 'opencode', side: 'right', mode: 'floating' })).toEqual({
+      enabled: true,
+      provider: 'opencode',
+      side: 'right',
+      mode: 'floating',
+    })
+    expect(parseChatSettings({ enabled: true, provider: 'opencode', side: 'bottom', mode: 'docked' })).toEqual({
+      enabled: true,
+      provider: 'opencode',
+      side: 'left',
+      mode: 'panel',
+    })
   })
 
   test('an unknown provider keeps the switch but resets the provider', () => {
-    expect(parseChatSettings({ enabled: true, provider: 'claude' })).toEqual({ enabled: true, provider: 'opencode' })
+    expect(parseChatSettings({ enabled: true, provider: 'claude' })).toEqual({
+      enabled: true,
+      provider: 'opencode',
+      side: 'left',
+      mode: 'panel',
+    })
   })
 })

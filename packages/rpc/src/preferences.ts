@@ -14,23 +14,34 @@ import { localProcedure } from './procedures'
 const chatSettingsSchema = z.object({
   enabled: z.boolean(),
   provider: z.literal('opencode'),
+  side: z.enum(['left', 'right']),
+  mode: z.enum(['panel', 'floating']),
 })
 
-function toChatSettings(row: { chatEnabled: boolean; chatProvider: unknown } | undefined): ChatSettings {
+type ChatRow = { chatEnabled: boolean; chatProvider: unknown; chatSide: unknown; chatMode: unknown } | undefined
+
+function toChatSettings(row: ChatRow): ChatSettings {
   if (!row) return { ...DEFAULT_CHAT_SETTINGS }
-  return parseChatSettings({ enabled: row.chatEnabled, provider: row.chatProvider })
+  return parseChatSettings({ enabled: row.chatEnabled, provider: row.chatProvider, side: row.chatSide, mode: row.chatMode })
 }
 
-export const getPreferences = localProcedure.handler(async ({ context }) => {
+async function readChatRow(userId: string) {
   const [row] = await db
     .select({
       shortcuts: userPreferences.shortcuts,
       chatEnabled: userPreferences.chatEnabled,
       chatProvider: userPreferences.chatProvider,
+      chatSide: userPreferences.chatSide,
+      chatMode: userPreferences.chatMode,
     })
     .from(userPreferences)
-    .where(eq(userPreferences.userId, context.user.id))
+    .where(eq(userPreferences.userId, userId))
     .limit(1)
+  return row
+}
+
+export const getPreferences = localProcedure.handler(async ({ context }) => {
+  const row = await readChatRow(context.user.id)
   return {
     shortcuts: row ? parseShortcutConfig(row.shortcuts) : EMPTY_SHORTCUT_CONFIG,
     chat: toChatSettings(row),
@@ -45,15 +56,7 @@ export const savePreferences = localProcedure
     }),
   )
   .handler(async ({ context, input }) => {
-    const [row] = await db
-      .select({
-        shortcuts: userPreferences.shortcuts,
-        chatEnabled: userPreferences.chatEnabled,
-        chatProvider: userPreferences.chatProvider,
-      })
-      .from(userPreferences)
-      .where(eq(userPreferences.userId, context.user.id))
-      .limit(1)
+    const row = await readChatRow(context.user.id)
     const shortcuts = input.shortcuts !== undefined ? parseShortcutConfig(input.shortcuts) : row ? parseShortcutConfig(row.shortcuts) : EMPTY_SHORTCUT_CONFIG
     const chat = input.chat !== undefined ? parseChatSettings(input.chat) : toChatSettings(row)
     await db
@@ -63,6 +66,8 @@ export const savePreferences = localProcedure
         shortcuts,
         chatEnabled: chat.enabled,
         chatProvider: chat.provider,
+        chatSide: chat.side,
+        chatMode: chat.mode,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
@@ -71,6 +76,8 @@ export const savePreferences = localProcedure
           shortcuts,
           chatEnabled: chat.enabled,
           chatProvider: chat.provider,
+          chatSide: chat.side,
+          chatMode: chat.mode,
           updatedAt: new Date(),
         },
       })

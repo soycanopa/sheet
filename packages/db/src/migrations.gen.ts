@@ -28,5 +28,11 @@ export const migrations: ReadonlyArray<{
     "when": 1793933634947,
     "breakpoints": true,
     "sql": "ALTER TABLE `user_preferences` ADD `chat_enabled` integer DEFAULT false NOT NULL;--> statement-breakpoint\nALTER TABLE `user_preferences` ADD `chat_provider` text DEFAULT 'opencode' NOT NULL;"
+  },
+  {
+    "tag": "0004_bumpy_rafael_vega",
+    "when": 1793934848545,
+    "breakpoints": true,
+    "sql": "ALTER TABLE `user_preferences` ADD `chat_side` text DEFAULT 'left' NOT NULL;--> statement-breakpoint\nALTER TABLE `user_preferences` ADD `chat_mode` text DEFAULT 'panel' NOT NULL;"
   }
 ]

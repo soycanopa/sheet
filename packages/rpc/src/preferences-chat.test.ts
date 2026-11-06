@@ -13,17 +13,17 @@ describe('chat preferences', () => {
     const get = appRouter.preferences.get.callable(context)
     const save = appRouter.preferences.save.callable(context)
 
-    expect((await get()).chat).toEqual({ enabled: false, provider: 'opencode' })
+    expect((await get()).chat).toEqual({ enabled: false, provider: 'opencode', side: 'left', mode: 'panel' })
 
-    const saved = await save({ chat: { enabled: true, provider: 'opencode' } })
-    expect(saved.chat).toEqual({ enabled: true, provider: 'opencode' })
-    expect((await get()).chat).toEqual({ enabled: true, provider: 'opencode' })
+    const saved = await save({ chat: { enabled: true, provider: 'opencode', side: 'right', mode: 'floating' } })
+    expect(saved.chat).toEqual({ enabled: true, provider: 'opencode', side: 'right', mode: 'floating' })
+    expect((await get()).chat).toEqual({ enabled: true, provider: 'opencode', side: 'right', mode: 'floating' })
 
     await save({ shortcuts: EMPTY_SHORTCUT_CONFIG })
-    expect((await get()).chat).toEqual({ enabled: true, provider: 'opencode' })
+    expect((await get()).chat).toEqual({ enabled: true, provider: 'opencode', side: 'right', mode: 'floating' })
 
-    await save({ chat: { enabled: false, provider: 'opencode' } })
-    expect((await get()).chat).toEqual({ enabled: false, provider: 'opencode' })
+    await save({ chat: { enabled: false, provider: 'opencode', side: 'left', mode: 'panel' } })
+    expect((await get()).chat).toEqual({ enabled: false, provider: 'opencode', side: 'left', mode: 'panel' })
   })
 
   it('rejects an unknown provider', async () => {

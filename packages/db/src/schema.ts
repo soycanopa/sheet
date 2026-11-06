@@ -10,7 +10,7 @@ import type { CanvasDocument } from '@sheet/canvas/legacy-model'
 import type { WebDocument, WebTransaction } from '@sheet/canvas/web-model'
 export type DraftStatus = 'active' | 'proposed' | 'applied' | 'closed'
 import { EMPTY_SHORTCUT_CONFIG, type ShortcutConfig } from './shortcuts'
-import type { ChatProvider } from './chat'
+import type { ChatMode, ChatProvider, ChatSide } from './chat'
 
 /**
  * Local-first schema. One user, no accounts, no sharing, no billing, no
@@ -230,6 +230,8 @@ export const userPreferences = sqliteTable('user_preferences', {
     .notNull(),
   chatEnabled: integer('chat_enabled', { mode: 'boolean' }).default(false).notNull(),
   chatProvider: text('chat_provider').$type<ChatProvider>().default('opencode').notNull(),
+  chatSide: text('chat_side').$type<ChatSide>().default('left').notNull(),
+  chatMode: text('chat_mode').$type<ChatMode>().default('panel').notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .$defaultFn(now)
     .notNull(),

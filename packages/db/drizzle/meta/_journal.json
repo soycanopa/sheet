@@ -29,6 +29,13 @@
       "when": 1793933634947,
       "tag": "0003_jittery_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793934848545,
+      "tag": "0004_bumpy_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

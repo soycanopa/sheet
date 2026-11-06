@@ -13,11 +13,23 @@ export const DEFAULT_CHAT_PROVIDER: ChatProvider = 'opencode'
 export interface ChatSettings {
   enabled: boolean
   provider: ChatProvider
+  side: ChatSide
+  mode: ChatMode
 }
+
+export const CHAT_SIDES = ['left', 'right'] as const
+
+export type ChatSide = (typeof CHAT_SIDES)[number]
+
+export const CHAT_MODES = ['panel', 'floating'] as const
+
+export type ChatMode = (typeof CHAT_MODES)[number]
 
 export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   enabled: false,
   provider: DEFAULT_CHAT_PROVIDER,
+  side: 'left',
+  mode: 'panel',
 }
 
 function isChatProvider(input: unknown): input is ChatProvider {
@@ -31,5 +43,7 @@ export function parseChatSettings(input: unknown): ChatSettings {
   return {
     enabled: settings.enabled === true,
     provider: isChatProvider(settings.provider) ? settings.provider : DEFAULT_CHAT_PROVIDER,
+    side: settings.side === 'right' ? 'right' : 'left',
+    mode: settings.mode === 'floating' ? 'floating' : 'panel',
   }
 }
