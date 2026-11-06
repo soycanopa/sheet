@@ -1,6 +1,20 @@
 import type { WebElementNode, WebNode, WebOperation } from './web-model'
 
-export type IconLibrary = 'hugeicons' | 'lucide'
+export type IconLibrary = 'hugeicons' | 'lucide' | 'runeicons'
+
+/**
+ * The RuneIcons collections: one glyph drawn five ways. The picker labels
+ * them by mood; `type` is the key the runeicons package files them under.
+ */
+export const RUNE_STYLES = [
+  { id: 'outline', type: 'normal', label: 'Outline' },
+  { id: 'duotone', type: 'duotone', label: 'Duotone' },
+  { id: 'fill', type: 'fill', label: 'Fill' },
+  { id: 'pixel', type: 'pixelated', label: 'Pixel' },
+  { id: 'glass', type: 'glass', label: 'Glass' },
+] as const
+
+export type RuneIconStyle = (typeof RUNE_STYLES)[number]['id']
 
 export interface IconStyle {
   color?: string
@@ -16,7 +30,7 @@ export function iconInfo(node: WebNode | null | undefined) {
   if (!isIconNode(node)) return null
   const library = node.attributes['data-icon-library']
   return {
-    library: library === 'lucide' ? 'lucide' : 'hugeicons',
+    library: library === 'lucide' ? 'lucide' : library === 'runeicons' ? 'runeicons' : 'hugeicons',
     name: node.attributes['data-icon-name'] ?? '',
   } satisfies { library: IconLibrary; name: string }
 }

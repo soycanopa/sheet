@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
   ICON_LIBRARIES,
+  RUNE_STYLES,
+  iconData,
   iconInfo,
   iconNodes,
   iconStyleOperation,
@@ -28,10 +30,35 @@ function withIcon(library: 'lucide' | 'hugeicons', name: string) {
 
 describe('web icons', () => {
   test('searches every supported library', () => {
-    expect(ICON_LIBRARIES.map((entry) => entry.id)).toEqual(['hugeicons', 'lucide'])
+    expect(ICON_LIBRARIES.map((entry) => entry.id)).toEqual(['hugeicons', 'lucide', 'runeicons'])
+    expect(RUNE_STYLES.map((entry) => entry.id)).toEqual(['outline', 'duotone', 'fill', 'pixel', 'glass'])
     expect(searchIcons('heart', 'lucide').every((icon) => icon.library === 'lucide')).toBe(true)
     const libraries = new Set(searchIcons('heart').map((icon) => icon.library))
-    expect(libraries).toEqual(new Set(['hugeicons', 'lucide']))
+    expect(libraries).toEqual(new Set(['hugeicons', 'lucide', 'runeicons']))
+  })
+
+  test('rune icons carry their collection and viewBox', () => {
+    const [match] = searchIcons('arrow down', 'runeicons', 5)
+    expect(match?.library).toBe('runeicons')
+    expect(match?.name).toBe('Arrow Down')
+    expect(match?.style).toBe('outline')
+    const outline = iconNodes('runeicons', 'Arrow Down', { parentId: null, order: 1 })
+    const pixel = iconNodes('runeicons', 'Arrow Down', { parentId: null, order: 1, style: 'pixel' })
+    expect(outline?.[0]?.kind === 'element' && outline[0].attributes['viewBox']).toBe('0 0 24 24')
+    expect(pixel?.[0]?.kind === 'element' && pixel[0].attributes['viewBox']).toBe('0 0 40 41')
+    expect(pixel?.[0]?.kind === 'element' && pixel[0].attributes['data-icon-style']).toBe('pixel')
+    expect(iconInfo(outline?.[0])?.library).toBe('runeicons')
+  })
+
+  test('rune icons fall back to an available collection', () => {
+    // Archive 1 ships glass only, so the outline default resolves to glass…
+    const match = searchIcons('archive 1', 'runeicons', 20).find((icon) => icon.name === 'Archive 1')
+    expect(match?.style).toBe('glass')
+    // …and the glass tree keeps its nested mask groups.
+    const entry = iconData('runeicons', match?.name ?? '', 'glass')
+    const masks = (entry?.data ?? []).filter((shape) => shape.tag === 'mask' || shape.tag === 'g')
+    expect(masks.length).toBeGreaterThan(0)
+    expect(iconNodes('runeicons', 'definitely-not-an-icon', { parentId: null, order: 1 })).toBeNull()
   })
 
   test('returns null for an unknown icon', () => {
