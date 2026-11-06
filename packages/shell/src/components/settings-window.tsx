@@ -14,7 +14,7 @@ import { GeneralSettings } from './general-settings'
 import { ShortcutsSettings } from './shortcuts-settings'
 import { UpdatesSettings } from './updates-settings'
 
-type SectionId = 'general' | 'appearance' | 'agents' | 'sound' | 'shortcuts' | 'updates'
+type SectionId = 'general' | 'appearance' | 'agents' | 'mcp' | 'sound' | 'shortcuts' | 'updates'
 
 /**
  * Each section's mark, drawn on a 16px grid. The one in use draws itself in, so
@@ -56,6 +56,13 @@ function Glyph({ id, active }: { id: SectionId; active: boolean }) {
           <path className={draw} pathLength="1" d="M7 4.5h2.5V9" {...props} />
         </>
       ) : null}
+      {id === 'mcp' ? (
+        <>
+          <path className={draw} pathLength="1" d="M6 2.5v3M10 2.5v3" {...props} />
+          <rect x="4.5" y="5.5" width="7" height="5" {...props} />
+          <path className={draw} pathLength="1" d="M8 10.5v3" {...props} />
+        </>
+      ) : null}
     </svg>
   )
 }
@@ -63,7 +70,8 @@ function Glyph({ id, active }: { id: SectionId; active: boolean }) {
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; title: string }> = [
   { id: 'general', label: 'General', title: 'How Sheet behaves' },
   { id: 'appearance', label: 'Appearance', title: 'How Sheet looks' },
-  { id: 'agents', label: 'Agents', title: 'Connect an agent' },
+  { id: 'agents', label: 'Agents', title: 'Chat with your canvas' },
+  { id: 'mcp', label: 'MCP', title: 'Connect an external agent' },
   { id: 'sound', label: 'Sound', title: 'What Sheet sounds like' },
   { id: 'shortcuts', label: 'Shortcuts', title: 'Keys, your way' },
   { id: 'updates', label: 'Updates', title: 'Keep Sheet current' },
@@ -113,12 +121,9 @@ function Body({ section }: { section: SectionId }): ReactNode {
     case 'shortcuts':
       return <ShortcutsSection />
     case 'agents':
-      return (
-        <div className="flex flex-col gap-4 sm:gap-5">
-          <InternalChatSettings />
-          <ConnectAgent />
-        </div>
-      )
+      return <InternalChatSettings />
+    case 'mcp':
+      return <ConnectAgent />
     case 'updates':
       return <UpdatesSettings />
   }
