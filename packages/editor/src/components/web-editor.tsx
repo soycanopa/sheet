@@ -23,6 +23,7 @@ import {
   HandIcon,
   LayoutGridIcon,
   ImageIcon,
+  LayersIcon,
   LinkIcon,
   MaximizeIcon,
   MessageSquareIcon,
@@ -2082,7 +2083,7 @@ export function WebCanvasEditor({
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   // Left: the file's structure, what can be placed, its tokens. Right: the
   // selection, and the conversation about it.
-  const [leftTab, setLeftTab] = useState<'design' | 'assets' | 'theme' | 'chat'>('design')
+  const [leftTab, setLeftTab] = useState<'layers' | 'components' | 'fonts' | 'assets' | 'theme' | 'chat'>('layers')
   const [assetsKind, setAssetsKind] = useState<'images' | 'icons'>('images')
   const [rightTab, setRightTab] = useState<'design' | 'comments' | 'chat'>('design')
   const [chatSide, setChatSide] = useState<'left' | 'right'>('left')
@@ -2139,7 +2140,7 @@ export function WebCanvasEditor({
   }, [])
 
   useEffect(() => {
-    if (chatSide === 'right' && leftTab === 'chat') setLeftTab('design')
+    if (chatSide === 'right' && leftTab === 'chat') setLeftTab('layers')
     if (chatSide === 'left' && rightTab === 'chat') setRightTab('design')
   }, [chatSide, leftTab, rightTab])
 
@@ -2679,7 +2680,7 @@ export function WebCanvasEditor({
     setPageSelected(false)
     transact(`Insert ${icon.name} icon`, nodes.map((node) => ({ type: 'node.insert' as const, node })))
     setTool('select')
-    setLeftTab('design')
+    setLeftTab('layers')
   }, [placeInsert, setTool, transact])
 
   const selectionColors = useMemo(() => {
@@ -3944,14 +3945,17 @@ export function WebCanvasEditor({
               value={leftTab}
               onChange={setLeftTab}
               options={[
-                // Pages and Layers live under it, so the tab names the whole file.
-                { value: 'design', label: 'File' },
-                { value: 'assets', label: 'Assets' },
-                { value: 'theme', label: 'Theme' },
-                ...(chatSide === 'left' && chatMode === 'panel' ? [{ value: 'chat', label: 'Chat' } as const] : []),
+                { value: 'layers', label: 'Layers', icon: <LayersIcon className="size-4" /> },
+                { value: 'components', label: 'Components', icon: <ComponentIcon className="size-4" /> },
+                { value: 'fonts', label: 'Fonts', icon: <TypeIcon className="size-4" /> },
+                { value: 'assets', label: 'Assets', icon: <ImageIcon className="size-4" /> },
+                { value: 'theme', label: 'Theme', icon: <ColorsIcon className="size-4" /> },
+                ...(chatSide === 'left' && chatMode === 'panel'
+                  ? [{ value: 'chat', label: 'Chat', icon: <BotIcon className="size-4" /> } as const]
+                  : []),
               ]}
             />
-            {leftTab === 'design' ? (
+            {leftTab === 'layers' ? (
               <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                 {/* Pages Section */}
                 <div className="border-b border-line">
@@ -4057,9 +4061,11 @@ export function WebCanvasEditor({
                     )}
                   </div>
                 </div>
-
+              </div>
+            ) : leftTab === 'components' ? (
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                 {/* Components Section */}
-                <div className="mt-2 flex items-center justify-between border-t border-line px-3 py-2 text-xs font-medium text-muted-foreground">
+                <div className="flex items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground">
                   <span>Components</span>
                   <button type="button" aria-label="Create component" title="Create component from selection" className="rounded p-1 hover:bg-secondary hover:text-foreground disabled:opacity-40" disabled={!selectedId} onClick={defineComponentFromSelection}>
                     <PlusIcon className="size-3.5" />
@@ -4090,8 +4096,11 @@ export function WebCanvasEditor({
                   )}
                 </div>
 
+              </div>
+            ) : leftTab === 'fonts' ? (
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                 {/* Fonts Section */}
-                <div className="border-t border-line px-3 py-2 text-xs font-medium text-muted-foreground">Fonts</div>
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Fonts</div>
                 <div className="space-y-0.5 px-2 pb-3">
                   {fonts.length === 0 ? (
                     <p className="px-1 text-xs text-muted-foreground">No fonts set yet. Pick one in Typography.</p>
@@ -4123,7 +4132,7 @@ export function WebCanvasEditor({
                     <AssetsPanel onInsert={(asset) => {
                       const place = placeInsert(240, 160)
                       insertElement('img', { x: place.x, y: place.y }, false, undefined, { src: assetSrc(asset), alt: asset.name }, place.parentId)
-                      setLeftTab('design')
+                      setLeftTab('layers')
                       setTool('select')
                     }} />
                   ) : (
