@@ -23,6 +23,7 @@ import {
   HandIcon,
   LayoutGridIcon,
   ImageIcon,
+  LinkIcon,
   MaximizeIcon,
   MessageSquareIcon,
   MinusIcon,
@@ -37,6 +38,8 @@ import {
   Trash2Icon,
   TypeIcon,
 } from '@sheet/ui/icons'
+import { ChatFloating } from './chat-floating'
+import { ChatPanel } from './chat-panel'
 import { ConnectAgent } from './connect-agent'
 import { FramePresetsPanel } from './frame-presets-panel'
 import { frameNode, freeFrameSpot, NEW_FRAME_SIZE, type FramePreset } from '@sheet/canvas/web-frames'
@@ -2079,9 +2082,46 @@ export function WebCanvasEditor({
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   // Left: the file's structure, what can be placed, its tokens. Right: the
   // selection, and the conversation about it.
-  const [leftTab, setLeftTab] = useState<'design' | 'assets' | 'theme'>('design')
+  const [leftTab, setLeftTab] = useState<'design' | 'assets' | 'theme' | 'chat'>('design')
   const [assetsKind, setAssetsKind] = useState<'images' | 'icons'>('images')
-  const [rightTab, setRightTab] = useState<'design' | 'comments'>('design')
+  const [rightTab, setRightTab] = useState<'design' | 'comments' | 'chat'>('design')
+  const [chatSide, setChatSide] = useState<'left' | 'right'>('left')
+  const [chatMode, setChatMode] = useState<'panel' | 'floating'>('panel')
+  const [chatFloatOpen, setChatFloatOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void orpc.preferences
+      .get()
+      .then((preferences) => {
+        if (cancelled) return
+        setChatSide(preferences.chat.side)
+        setChatMode(preferences.chat.mode)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (chatSide === 'right' && leftTab === 'chat') setLeftTab('design')
+    if (chatSide === 'left' && rightTab === 'chat') setRightTab('design')
+  }, [chatSide, leftTab, rightTab])
+
+  const openChat = useCallback(() => {
+    if (chatMode === 'floating') {
+      setChatFloatOpen((open) => !open)
+      return
+    }
+    if (chatSide === 'right') {
+      setRightPanelOpen(true)
+      setRightTab('chat')
+      return
+    }
+    setLeftPanelOpen(true)
+    setLeftTab('chat')
+  }, [chatMode, chatSide])
   const [leftWidth, setLeftWidth] = usePanelWidth('sheet:panel-left', 256)
   const [rightWidth, setRightWidth] = usePanelWidth('sheet:panel-right', 288)
   const { comments, create: createComment, resolve: resolveComment, remove: removeComment } = useDesignComments(designId)
@@ -3604,10 +3644,11 @@ export function WebCanvasEditor({
     { id: 'comments', label: 'Show comments', keywords: 'feedback threads', icon: <MessageSquareIcon />, run: () => { setRightPanelOpen(true); setRightTab('comments') } },
     { id: 'icons', label: 'Browse icons', keywords: 'insert library', icon: <ComponentIcon />, run: () => { setLeftPanelOpen(true); setLeftTab('assets'); setAssetsKind('icons') } },
     { id: 'shaders', label: 'Browse shaders', keywords: 'gradient background', icon: <ColorsIcon />, run: () => setShadersOpen(true) },
-    { id: 'agent', label: 'Connect an agent', keywords: 'mcp claude cursor', icon: <BotIcon />, run: () => setConnectAgentOpen(true) },
+    { id: 'agent', label: 'Connect an external agent', keywords: 'mcp claude cursor', icon: <LinkIcon />, run: () => setConnectAgentOpen(true) },
+    { id: 'chat', label: 'Open chat', keywords: 'agent chat opencode', icon: <BotIcon />, run: openChat },
     // Every dependency is stable between renders that change nothing here, so
     // the palette re-registers only when a label or an action really changes.
-  ], [fitToView, focusMode, leftPanelOpen, rightPanelOpen, setTool, shortcutConfig, toggleFocusMode])
+  ], [fitToView, focusMode, leftPanelOpen, openChat, rightPanelOpen, setTool, shortcutConfig, toggleFocusMode])
   useRegisterCommands('editor', paletteCommands)
 
   const barButtonClassName =
@@ -3743,6 +3784,14 @@ export function WebCanvasEditor({
       <div className="my-1 h-px w-5 shrink-0 bg-line/80" />
 
       <WebToolButton
+        label="Chat"
+        aria-label="Chat"
+        active={chatMode === 'floating' ? chatFloatOpen : (chatSide === 'right' ? rightPanelOpen && rightTab === 'chat' : leftPanelOpen && leftTab === 'chat')}
+        onClick={openChat}
+      >
+        <BotIcon className="size-4" />
+      </WebToolButton>
+      <WebToolButton
         label="Comment (C)"
         aria-label="Comment"
         active={tool === 'comment'}
@@ -3864,6 +3913,7 @@ export function WebCanvasEditor({
                 { value: 'design', label: 'File' },
                 { value: 'assets', label: 'Assets' },
                 { value: 'theme', label: 'Theme' },
+                ...(chatSide === 'left' && chatMode === 'panel' ? [{ value: 'chat', label: 'Chat' } as const] : []),
               ]}
             />
             {leftTab === 'design' ? (
@@ -4046,6 +4096,8 @@ export function WebCanvasEditor({
                   )}
                 </div>
               </div>
+            ) : leftTab === 'chat' ? (
+              <ChatPanel designId={designId} />
             ) : (
               <ThemePanel document={document} transact={transact} />
             )}
@@ -4559,6 +4611,7 @@ export function WebCanvasEditor({
                   </span>
                 ) : undefined,
               },
+              ...(chatSide === 'right' && chatMode === 'panel' ? [{ value: 'chat', label: 'Chat' } as const] : []),
             ]}
             trailing={
               rightTab === 'design' && tool !== 'frame' && selectedId ? (
@@ -4576,7 +4629,11 @@ export function WebCanvasEditor({
             }
           />
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
-            {rightTab === 'comments' ? (
+            {rightTab === 'chat' ? (
+              <div className="flex min-h-full flex-col">
+                <ChatPanel designId={designId} />
+              </div>
+            ) : rightTab === 'comments' ? (
               <CommentsList
                 comments={comments}
                 onSelectNode={(nodeId) => {
@@ -4643,15 +4700,18 @@ export function WebCanvasEditor({
           </div>
         </aside>
         ) : null}
+        {chatMode === 'floating' && chatFloatOpen ? (
+          <ChatFloating designId={designId} onClose={() => setChatFloatOpen(false)} />
+        ) : null}
       </div>
 
       <ShaderGallery open={shadersOpen} onOpenChange={setShadersOpen} onPick={insertShader} />
 
-      {/* Connect Agent Dialog */}
+      {/* External agent (MCP) dialog */}
       <Dialog open={connectAgentOpen} onOpenChange={setConnectAgentOpen}>
         <DialogPopup className="max-w-xl bg-surface text-foreground">
           <DialogHeader>
-            <DialogTitle className="text-base">Connect your agent</DialogTitle>
+            <DialogTitle className="text-base">Connect an external agent</DialogTitle>
             <DialogDescription className="text-xs">
               Sheet runs a local MCP server. Pick your agent and follow the steps.
             </DialogDescription>
