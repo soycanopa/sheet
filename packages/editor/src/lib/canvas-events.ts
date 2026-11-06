@@ -34,6 +34,48 @@ function parseActivity(value: unknown): AgentActivity | null {
   }
 }
 
+/** A streamed fragment of the internal chat, as the server announces it. */
+export interface ChatDelta {
+  sessionId: string
+  seq: number
+  kind: 'text' | 'thinking' | 'tool' | 'usage' | 'done' | 'error'
+  text?: string
+  tool?: string
+  stopReason?: string | null
+  usage?: { inputTokens: number; outputTokens: number } | null
+  message?: string | null
+}
+
+function parseChatDelta(value: unknown): ChatDelta | null {
+  if (!value || typeof value !== 'object') return null
+  const sessionId = Reflect.get(value, 'sessionId')
+  const seq = Reflect.get(value, 'seq')
+  const kind = Reflect.get(value, 'kind')
+  if (typeof sessionId !== 'string' || typeof seq !== 'number' || !Number.isInteger(seq)) return null
+  if (kind !== 'text' && kind !== 'thinking' && kind !== 'tool' && kind !== 'usage' && kind !== 'done' && kind !== 'error') {
+    return null
+  }
+  const text = Reflect.get(value, 'text')
+  const tool = Reflect.get(value, 'tool')
+  const usage = Reflect.get(value, 'usage')
+  return {
+    sessionId,
+    seq,
+    kind,
+    text: typeof text === 'string' ? text : undefined,
+    tool: typeof tool === 'string' ? tool : undefined,
+    stopReason: typeof Reflect.get(value, 'stopReason') === 'string' ? (Reflect.get(value, 'stopReason') as string) : null,
+    usage:
+      usage && typeof usage === 'object' && typeof Reflect.get(usage, 'inputTokens') === 'number' && typeof Reflect.get(usage, 'outputTokens') === 'number'
+        ? {
+            inputTokens: Reflect.get(usage, 'inputTokens') as number,
+            outputTokens: Reflect.get(usage, 'outputTokens') as number,
+          }
+        : null,
+    message: typeof Reflect.get(value, 'message') === 'string' ? (Reflect.get(value, 'message') as string) : null,
+  }
+}
+
 export function subscribeCanvasChanges(
   designId: string | null,
   onChange: (revision: number) => void,
@@ -42,6 +84,8 @@ export function subscribeCanvasChanges(
     onReady?: () => void
     /** Called with the running or just-finished agent activity, or `null` when it clears. */
     onAgentActivity?: (activity: AgentActivity | null) => void
+    /** Called with each streamed fragment of the internal chat. */
+    onChatDelta?: (delta: ChatDelta) => void
   } = {},
 ) {
   if (typeof EventSource === 'undefined') return () => {}
@@ -64,6 +108,9 @@ export function subscribeCanvasChanges(
         onChange(event.revision)
       } else if (event.type === 'agent.activity' && 'activity' in event) {
         options.onAgentActivity?.(parseActivity(event.activity))
+      } else if (event.type === 'chat.delta') {
+        const delta = parseChatDelta(event)
+        if (delta) options.onChatDelta?.(delta)
       }
     } catch {
       // Ignore malformed stream frames; EventSource reconnects itself.
