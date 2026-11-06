@@ -35,6 +35,16 @@ interface ManagedSession {
   currentText: string
   listedTools: boolean
   listedAt: number
+  preview: string
+  updatedAt: number
+}
+
+export interface ChatSessionSummary {
+  id: string
+  designId: string
+  preview: string
+  updatedAt: number
+  busy: boolean
 }
 
 const MAX_TRANSCRIPT = 200
@@ -176,6 +186,8 @@ class ChatManager {
       currentText: '',
       listedTools: false,
       listedAt: Date.now(),
+      preview: '',
+      updatedAt: Date.now(),
     }
     const url = `http://127.0.0.1:${mcpPort()}/mcp`
     session.started = await startOpenCodeSession({
@@ -296,6 +308,8 @@ class ChatManager {
     session.busy = true
     session.currentText = ''
     pushTranscript(session, { role: 'user', text: text.slice(0, 20_000) })
+    if (!session.preview) session.preview = text.slice(0, 60)
+    session.updatedAt = Date.now()
     void this.runTurn(session, text).finally(() => {
       session.busy = false
     })
@@ -332,7 +346,28 @@ class ChatManager {
       }
       const message = error instanceof Error ? error.message : String(error)
       delta(session, 'error', { message: message.slice(0, 500) })
+    } finally {
+      session.updatedAt = Date.now()
     }
+  }
+
+  list(designId: string): ChatSessionSummary[] {
+    return [...this.sessions.values()]
+      .filter((session) => session.designId === designId)
+      .map((session) => ({
+        id: session.id,
+        designId: session.designId,
+        preview: session.preview || 'New chat',
+        updatedAt: session.updatedAt,
+        busy: session.busy,
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+
+  getView(id: string): ChatSessionView {
+    const session = this.sessions.get(id)
+    if (!session) throw new Error('Unknown chat session.')
+    return this.view(session)
   }
 
   async cancel(id: string): Promise<{ cancelled: boolean }> {

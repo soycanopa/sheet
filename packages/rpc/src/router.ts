@@ -42,9 +42,11 @@ import { getPreferences, savePreferences } from './preferences'
 import {
   cancelChat,
   closeChat,
+  getChat,
   getChatHistory,
   getChatStatus,
   listChatModels,
+  listChats,
   sendChat,
   startChat,
 } from './chat/procedures'
@@ -61,6 +63,8 @@ export const appRouter = {
     cancel: cancelChat,
     history: getChatHistory,
     close: closeChat,
+    list: listChats,
+    get: getChat,
   },
   design: {
     list: listDesigns,

@@ -19,9 +19,13 @@ describe('chat procedures', () => {
     const start = appRouter.chat.start.callable(context)
     const send = appRouter.chat.send.callable(context)
     const models = appRouter.chat.models.callable(context)
+    const list = appRouter.chat.list.callable(context)
+    const get = appRouter.chat.get.callable(context)
     await expect(start({ designId: 'd1' })).rejects.toThrow(/off/)
     await expect(send({ sessionId: 's1', text: 'hi' })).rejects.toThrow(/off/)
     await expect(models()).rejects.toThrow(/off/)
+    await expect(list({ designId: 'd1' })).rejects.toThrow(/off/)
+    await expect(get({ sessionId: 's1' })).rejects.toThrow(/off/)
   })
 
   it('validates send input', async () => {
