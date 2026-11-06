@@ -2117,14 +2117,23 @@ export function WebCanvasEditor({
     return () => window.removeEventListener('focus', refreshPlacement)
   }, [refreshPlacement])
 
+  const persistFloatOpen = (open: boolean) => {
+    try {
+      window.localStorage.setItem('sheet:chat-float-open', open ? '1' : '0')
+    } catch {
+      // A blocked store never breaks the chat.
+    }
+  }
+
+  const setFloatOpen = useCallback((open: boolean) => {
+    setChatFloatOpen(open)
+    persistFloatOpen(open)
+  }, [])
+
   const toggleFloat = useCallback(() => {
     setChatFloatOpen((open) => {
       const next = !open
-      try {
-        window.localStorage.setItem('sheet:chat-float-open', next ? '1' : '0')
-      } catch {
-        // A blocked store never breaks the chat.
-      }
+      persistFloatOpen(next)
       return next
     })
   }, [])
@@ -4726,8 +4735,8 @@ export function WebCanvasEditor({
           </div>
         </aside>
         ) : null}
-        {chatMode === 'floating' && chatFloatOpen ? (
-          <ChatFloating designId={designId} onClose={() => setChatFloatOpen(false)} />
+        {chatMode === 'floating' ? (
+          <ChatFloating designId={designId} open={chatFloatOpen} onOpenChange={setFloatOpen} />
         ) : null}
       </div>
 
