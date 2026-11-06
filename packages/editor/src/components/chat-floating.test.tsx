@@ -17,7 +17,11 @@ const history = vi.fn(
     transcript: [{ role: 'user', text: 'Hello Duma', turn: 0 }],
   }),
 )
-const list = vi.fn(async () => ({ sessions: [] }))
+const list = vi.fn(
+  async (): Promise<{ sessions: { id: string; preview: string; updatedAt: number; busy: boolean }[] }> => ({
+    sessions: [],
+  }),
+)
 const get = vi.fn(async (input: { sessionId: string }) => ({
   id: input.sessionId,
   designId: 'design-1',
@@ -45,6 +49,7 @@ describe('ChatFloating', () => {
     start.mockClear()
     list.mockClear()
     get.mockClear()
+    close.mockClear()
     list.mockResolvedValue({ sessions: [] })
   })
 
@@ -100,6 +105,18 @@ describe('ChatFloating', () => {
     fireEvent.pointerUp(window)
     expect(window_.style.width).toBe('620px')
     expect(window_.style.height).toBe('530px')
+  })
+
+  test('deletes a session from the rail without bringing it back', async () => {
+    list.mockResolvedValue({
+      sessions: [{ id: 'chat-9', preview: 'Old question', updatedAt: Date.now(), busy: false }],
+    })
+    render(<ChatFloating designId="design-1" open={true} onOpenChange={() => undefined} />)
+    expect(await screen.findByRole('button', { current: true })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Old question' }))
+    expect(close).toHaveBeenCalledWith({ sessionId: 'chat-9' })
+    expect(await screen.findByText('No chats yet')).toBeTruthy()
+    expect(screen.queryByRole('button', { current: true })).toBeNull()
   })
 
   test('collapses from the header control', async () => {

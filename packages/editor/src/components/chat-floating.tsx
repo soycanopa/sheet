@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { orpc } from '@sheet/rpc/client'
-import { BotIcon, ChevronDownIcon, PlusIcon } from '@sheet/ui/icons'
+import { BotIcon, ChevronDownIcon, PlusIcon, XIcon } from '@sheet/ui/icons'
 import { cn } from '@sheet/ui/utils'
 import { ChatPanel } from './chat-panel'
 
@@ -72,6 +72,7 @@ export function ChatFloating({
   const [sessions, setSessions] = useState<FloatSession[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [size, setSize] = useState<FloatSize>(loadFloatSize)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -101,6 +102,7 @@ export function ChatFloating({
           const entry: FloatSession = { id: view.id, preview: 'New chat', updatedAt: Date.now(), busy: view.busy }
           setSessions([entry])
           setCurrentId(entry.id)
+          setLoaded(true)
           return
         }
         setSessions(result.sessions)
@@ -108,9 +110,12 @@ export function ChatFloating({
           if (current && result.sessions.some((session) => session.id === current)) return current
           return result.sessions[0]?.id ?? null
         })
+        setLoaded(true)
+        return
       } catch {
         // The thread shows the failure; the rail stays as it was.
       }
+      setLoaded(true)
     })()
     return () => {
       cancelled = true
@@ -153,6 +158,14 @@ export function ChatFloating({
         // The thread shows the failure; the rail stays as it was.
       }
     })()
+  }
+
+  const removeSession = (id: string) => {
+    // The server drops the stored row too, so a deleted chat never comes back.
+    void orpc.chat.close({ sessionId: id }).catch(() => undefined)
+    const next = sessions.filter((session) => session.id !== id)
+    setSessions(next)
+    setCurrentId((current) => (current !== id ? current : (next[0]?.id ?? null)))
   }
 
   /**
@@ -224,18 +237,31 @@ export function ChatFloating({
           </p>
           <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 pb-2">
             {current ? (
-              <button
+              <div
                 key={current.id}
-                type="button"
-                aria-current="true"
-                onClick={() => setCurrentId(current.id)}
-                className="rounded-md bg-secondary px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex items-start gap-1 rounded-md bg-secondary px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="block truncate text-xs font-medium text-foreground">{current.preview}</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                  {current.busy ? 'Working' : 'Idle'}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  aria-current="true"
+                  onClick={() => setCurrentId(current.id)}
+                  className="min-w-0 flex-1 text-left outline-none"
+                >
+                  <span className="block truncate text-xs font-medium text-foreground">{current.preview}</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    {current.busy ? 'Working' : 'Idle'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${current.preview}`}
+                  title="Delete chat"
+                  onClick={() => removeSession(current.id)}
+                  className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </div>
             ) : null}
             {older.length > 0 ? (
               <p className="px-2 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -243,21 +269,48 @@ export function ChatFloating({
               </p>
             ) : null}
             {older.map((session) => (
-              <button
+              <div
                 key={session.id}
-                type="button"
-                onClick={() => setCurrentId(session.id)}
-                className="rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex items-start gap-1 rounded-md px-2 py-1.5 outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="block truncate text-xs text-foreground">{session.preview}</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">{chatTimeAgo(session.updatedAt)}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentId(session.id)}
+                  className="min-w-0 flex-1 text-left outline-none"
+                >
+                  <span className="block truncate text-xs text-foreground">{session.preview}</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">{chatTimeAgo(session.updatedAt)}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${session.preview}`}
+                  title="Delete chat"
+                  onClick={() => removeSession(session.id)}
+                  className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </div>
             ))}
           </div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           {current ? (
             <ChatPanel key={current.id} designId={designId} sessionId={current.id} />
+          ) : loaded ? (
+            <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-2 px-4 py-8">
+              <p className="text-xs font-medium text-foreground">No chats yet</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Deleted chats stay deleted. Start a fresh one with Duma.
+              </p>
+              <button
+                type="button"
+                onClick={startNew}
+                className="mt-1 rounded-md bg-cx-accent px-2.5 py-1.5 text-xs font-medium text-white outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                New chat
+              </button>
+            </div>
           ) : (
             <p className="px-3 py-4 text-xs text-muted-foreground">Opening chat…</p>
           )}
