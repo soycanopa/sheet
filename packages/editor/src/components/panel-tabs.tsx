@@ -1,7 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react'
 import { cn } from '@sheet/ui/utils'
 
-type Option<T extends string> = { value: T; label: string; badge?: ReactNode }
+type Option<T extends string> = { value: T; label: string; badge?: ReactNode; icon?: ReactNode }
 
 /** Left/Right arrows move between options, as in any tab list or radio group. */
 function arrowNavigate<T extends string>(
@@ -22,8 +22,9 @@ function arrowNavigate<T extends string>(
 }
 
 /**
- * The tabs across the top of a side panel: words, not icons, so every view is
- * named. A 2px underline glides to the one in use.
+ * The tabs across the top of a side panel. A tab with an icon shows the icon
+ * alone at rest and icon plus name in use, so the strip stays compact while
+ * the active view stays named. A 2px underline glides to the one in use.
  */
 export function PanelTabs<T extends string>({
   label,
@@ -55,6 +56,7 @@ export function PanelTabs<T extends string>({
               type="button"
               role="tab"
               aria-selected={selected}
+              aria-label={option.label}
               tabIndex={selected ? 0 : -1}
               data-cuelume-select=""
               onClick={() => onChange(option.value)}
@@ -63,7 +65,8 @@ export function PanelTabs<T extends string>({
                 selected ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {option.label}
+              {option.icon}
+              {selected || !option.icon ? option.label : null}
               {option.badge}
               <span
                 aria-hidden="true"
