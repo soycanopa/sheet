@@ -1,7 +1,7 @@
 import { LOCAL_USER_ID } from '@sheet/db'
 import { publishLocalEvent } from '@sheet/realtime/local-bus'
 import type { SessionUpdate } from './acp-client'
-import { CHAT_EFFORT_LEVELS, chatEffortCandidates, isChatReadOnlyTool, summarizeChatModels, type ChatModelEntry } from './opencode'
+import { CHAT_EFFORT_LEVELS, chatEffortCandidates, chatSourceName, isChatReadOnlyTool, summarizeChatModels, type ChatModelEntry } from './opencode'
 import { locateOpenCodeCli, startOpenCodeSession, waitForListedTools, type StartedSession } from './opencode-session'
 
 export interface ChatMessage {
@@ -15,7 +15,7 @@ export interface ChatSessionView {
   designId: string
   model: string | null
   effort: string
-  models: { value: string; name: string }[]
+  models: { value: string; name: string; source: string }[]
   efforts: { value: string; label: string }[]
   busy: boolean
   transcript: ChatMessage[]
@@ -361,18 +361,25 @@ class ChatManager {
   }
 }
 
-function modelOptions(configOptions: unknown[]): { value: string; name: string }[] {
+function modelOptions(configOptions: unknown[]): { value: string; name: string; source: string }[] {
   for (const option of configOptions) {
     if (typeof option !== 'object' || option === null) continue
     const record = option as { id?: unknown; category?: unknown; options?: unknown }
     if (record.id !== 'model' && record.category !== 'model') continue
-    const entries: { value: string; name: string }[] = []
+    const entries: { value: string; name: string; source: string }[] = []
     const visit = (items: unknown): void => {
       for (const item of Array.isArray(items) ? items : []) {
         if (typeof item !== 'object' || item === null) continue
         const entry = item as { value?: unknown; name?: unknown; options?: unknown }
         if (typeof entry.value === 'string') {
-          entries.push({ value: entry.value, name: typeof entry.name === 'string' ? entry.name : entry.value })
+          const slash = entry.value.indexOf('/')
+          const providerId = slash > 0 ? entry.value.slice(0, slash) : ''
+          const rawName = typeof entry.name === 'string' && entry.name ? entry.name : entry.value.slice(slash + 1)
+          // ACP display names repeat the provider (`xai/Grok 4.7`): the picker
+          // shows the short name with the provider underneath, like Fountible.
+          const prefix = providerId ? `${providerId}/` : ''
+          const name = rawName.startsWith(prefix) ? rawName.slice(prefix.length) : rawName
+          entries.push({ value: entry.value, name, source: chatSourceName(providerId) })
         }
         visit(entry.options)
       }
