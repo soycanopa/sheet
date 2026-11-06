@@ -48,21 +48,53 @@ function store(key: string, value: string): void {
  * Duma's thread: the streamed turn on top, Fountible's composer underneath.
  * Availability still belongs to the switch in Settings › Agents.
  */
-export function ChatPanel({ designId, className }: { designId: string; className?: string }) {
+export function ChatPanel({
+  designId,
+  sessionId,
+  className,
+}: {
+  designId: string
+  /** Controlled session (floating rail). Without it the panel owns one session per design. */
+  sessionId?: string
+  className?: string
+}) {
   const [state, setState] = useState<PanelState>({ phase: 'loading' })
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
+  const cacheSession = (next: ChatSessionState) => {
+    if (!sessionId) liveSessions.set(designId, next)
+  }
 
   useEffect(() => {
     let cancelled = false
-    const cached = liveSessions.get(designId)
+    const cached = sessionId ? null : liveSessions.get(designId)
     void (async () => {
       try {
         const status = await orpc.chat.status()
         if (cancelled) return
         if (!status.enabled) {
           setState({ phase: 'off' })
+          return
+        }
+        if (sessionId) {
+          const [view, history] = await Promise.all([
+            orpc.chat.get({ sessionId }),
+            orpc.chat.history({ sessionId }),
+          ])
+          if (cancelled) return
+          setState({
+            phase: 'on',
+            id: view.id,
+            models: view.models,
+            model: view.model,
+            efforts: view.efforts,
+            effort: view.effort,
+            messages: history.transcript,
+            busy: view.busy,
+            streaming: '',
+            activity: null,
+          })
           return
         }
         if (cached) {
@@ -92,7 +124,7 @@ export function ChatPanel({ designId, className }: { designId: string; className
           effort: view.effort,
           messages: view.transcript,
         }
-        liveSessions.set(designId, next)
+        cacheSession(next)
         setState({ phase: 'on', ...next, busy: view.busy, streaming: '', activity: null })
       } catch (cause) {
         if (!cancelled) {
@@ -110,8 +142,8 @@ export function ChatPanel({ designId, className }: { designId: string; className
         onChatDelta: (delta: ChatDelta) => {
           const current = stateRef.current
           if (current.phase !== 'on') return
-          const cachedSession = liveSessions.get(designId)
-          if (!cachedSession || delta.sessionId !== current.id) return
+          if (delta.sessionId !== current.id) return
+          const cachedSession = sessionId ? null : liveSessions.get(designId)
           if (delta.kind === 'text' && delta.text) {
             const streaming = current.streaming + delta.text
             setState({ ...current, streaming })
@@ -121,7 +153,7 @@ export function ChatPanel({ designId, className }: { designId: string; className
           if (delta.kind === 'tool' && delta.tool) {
             const activity = delta.tool.startsWith('denied ') ? delta.tool : `Called ${delta.tool}`
             const messages: ChatMsg[] = [...current.messages, { role: 'tool', text: '', tool: delta.tool }]
-            cachedSession.messages = messages
+            if (cachedSession) cachedSession.messages = messages
             setState({ ...current, messages, activity })
             return
           }
@@ -133,7 +165,7 @@ export function ChatPanel({ designId, className }: { designId: string; className
             if (delta.kind === 'error') {
               messages.push({ role: 'agent', text: delta.message ?? 'The turn failed.' })
             }
-            cachedSession.messages = messages
+            if (cachedSession) cachedSession.messages = messages
             setState({ ...current, messages, streaming: '', busy: false, activity: null })
           }
         },
@@ -143,7 +175,7 @@ export function ChatPanel({ designId, className }: { designId: string; className
       cancelled = true
       unsubscribe()
     }
-  }, [designId])
+  }, [designId, sessionId])
 
   useEffect(() => {
     const node = bottomRef.current
@@ -189,18 +221,22 @@ export function ChatPanel({ designId, className }: { designId: string; className
     const messages: ChatMsg[] = [...state.messages]
     if (state.streaming) messages.push({ role: 'agent', text: state.streaming })
     messages.push({ role: 'user', text })
-    const cached = liveSessions.get(designId)
-    if (cached) cached.messages = messages
-    const sessionId = state.id
+    if (!sessionId) {
+      const cached = liveSessions.get(designId)
+      if (cached) cached.messages = messages
+    }
+    const activeId = state.id
     setState({ ...state, messages, streaming: '', busy: true, activity: 'Thinking' })
     void orpc.chat
-      .send({ sessionId, text, model: state.model ?? undefined, effort: state.effort })
+      .send({ sessionId: activeId, text, model: state.model ?? undefined, effort: state.effort })
       .catch((cause: unknown) => {
         const current = stateRef.current
-        if (current.phase !== 'on' || current.id !== sessionId) return
+        if (current.phase !== 'on' || current.id !== activeId) return
         const failed: ChatMsg[] = [...current.messages, { role: 'agent', text: cause instanceof Error ? cause.message : 'The turn failed.' }]
-        const session = liveSessions.get(designId)
-        if (session) session.messages = failed
+        if (!sessionId) {
+          const session = liveSessions.get(designId)
+          if (session) session.messages = failed
+        }
         setState({ ...current, messages: failed, streaming: '', busy: false, activity: null })
       })
   }
@@ -211,15 +247,19 @@ export function ChatPanel({ designId, className }: { designId: string; className
 
   const setModel = (model: string | null) => {
     if (model) store('sheet:chat-model', model)
-    const cached = liveSessions.get(designId)
-    if (cached) cached.model = model
+    if (!sessionId) {
+      const cached = liveSessions.get(designId)
+      if (cached) cached.model = model
+    }
     setState({ ...state, model })
   }
 
   const setEffort = (effort: string) => {
     store('sheet:chat-effort', effort)
-    const cached = liveSessions.get(designId)
-    if (cached) cached.effort = effort
+    if (!sessionId) {
+      const cached = liveSessions.get(designId)
+      if (cached) cached.effort = effort
+    }
     setState({ ...state, effort })
   }
 

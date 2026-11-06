@@ -3,14 +3,17 @@ import { afterEach, beforeEach, describe, expect, vi, test } from 'vitest'
 
 const status = vi.fn(async () => ({ enabled: false, cli: { found: true, version: '2.2.5', sessions: 0 } }))
 const start = vi.fn()
-const history = vi.fn(async () => ({ transcript: [] }))
+const history = vi.fn(
+  async (): Promise<{ transcript: { role: string; text: string; turn: number }[] }> => ({ transcript: [] }),
+)
 const send = vi.fn(async () => ({ accepted: true }))
 const cancel = vi.fn(async () => ({ cancelled: true }))
+const get = vi.fn()
 
 vi.doMock('@sheet/rpc/client', () => ({
   orpc: {
     preferences: { get: vi.fn(), save: vi.fn() },
-    chat: { status, start, history, send, cancel },
+    chat: { status, start, history, send, cancel, get },
   },
 }))
 
@@ -38,6 +41,7 @@ describe('ChatPanel', () => {
     status.mockClear()
     start.mockClear()
     send.mockClear()
+    get.mockClear()
     status.mockResolvedValue({ enabled: false, cli: { found: true, version: '2.2.5', sessions: 0 } })
     start.mockResolvedValue(VIEW)
     history.mockResolvedValue({ transcript: [] })
@@ -59,6 +63,16 @@ describe('ChatPanel', () => {
     expect(screen.getByRole('button', { name: 'Effort' })).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Message' })).toBeTruthy()
     expect(start).toHaveBeenCalledWith({ designId: 'design-2', model: undefined, effort: undefined })
+  })
+
+  test('loads a named session without starting a new one', async () => {
+    status.mockResolvedValue({ enabled: true, cli: { found: true, version: '2.2.5', sessions: 0 } })
+    get.mockResolvedValue({ ...VIEW, id: 'chat-9', transcript: [] })
+    history.mockResolvedValue({ transcript: [{ role: 'user', text: 'Older question', turn: 0 }] })
+    render(<ChatPanel designId="design-4" sessionId="chat-9" />)
+    expect(await screen.findByText('Older question')).toBeTruthy()
+    expect(start).not.toHaveBeenCalled()
+    expect(get).toHaveBeenCalledWith({ sessionId: 'chat-9' })
   })
 
   test('sends the composer text to the session', async () => {
