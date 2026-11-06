@@ -35,24 +35,22 @@ function composer(props: Partial<React.ComponentProps<typeof ChatComposer>> = {}
 describe('ChatComposer', () => {
   afterEach(() => cleanup())
 
-  test('lists short names with the provider underneath, grouped by rail', () => {
+  test('lists every model with its short name over its provider', () => {
     composer()
     fireEvent.click(screen.getByRole('button', { name: 'Model' }))
-    expect(screen.getByRole('option', { name: /Grok 4\.7/ })?.textContent).toMatch('xAI')
-    // DeepSeek lives behind its own rail tab.
-    expect(screen.queryByRole('option', { name: /DeepSeek/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'DeepSeek' }))
-    const row = screen.getByRole('option', { name: /DeepSeek V4\.1/ })
-    expect(row.textContent).toMatch('DeepSeek V4.1 Flash 1017')
-    expect(row.textContent).not.toMatch('deepseek/')
+    const grok = screen.getByRole('option', { name: /Grok 4\.7/ })
+    expect(grok.textContent).toMatch('Grok 4.7')
+    expect(grok.textContent).toMatch('xAI')
+    expect(grok.textContent).not.toMatch('xai/')
+    const flash = screen.getByRole('option', { name: /DeepSeek V4\.1/ })
+    expect(flash.textContent).toMatch('DeepSeek')
   })
 
-  test('filters models by search', () => {
+  test('filters models by name or provider', () => {
     composer()
     fireEvent.click(screen.getByRole('button', { name: 'Model' }))
-    fireEvent.click(screen.getByRole('button', { name: 'DeepSeek' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'pro' } })
-    expect(screen.queryByRole('option', { name: /Flash/ })).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'deep' } })
+    expect(screen.queryByRole('option', { name: /Grok/ })).toBeNull()
     expect(screen.getByRole('option', { name: /V4 Pro/ })).toBeTruthy()
   })
 
@@ -61,7 +59,6 @@ describe('ChatComposer', () => {
     const onEffort = vi.fn()
     composer({ onModel, onEffort })
     fireEvent.click(screen.getByRole('button', { name: 'Model' }))
-    fireEvent.click(screen.getByRole('button', { name: 'DeepSeek' }))
     fireEvent.click(screen.getByRole('option', { name: /V4 Pro/ }))
     expect(onModel).toHaveBeenCalledWith('deepseek/deepseek-v4-pro')
     fireEvent.click(screen.getByRole('button', { name: 'Effort' }))

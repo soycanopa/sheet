@@ -34,7 +34,8 @@ describe('ChatFloating', () => {
   test('floats the same thread with a close control', async () => {
     const onClose = vi.fn()
     render(<ChatFloating designId="design-1" onClose={onClose} />)
-    expect(await screen.findByRole('combobox', { name: 'Effort' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Model' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Effort' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close chat' }))
     expect(onClose).toHaveBeenCalled()
   })

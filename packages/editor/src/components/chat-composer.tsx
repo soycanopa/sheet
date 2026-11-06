@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpIcon, CheckIcon, ChevronDownIcon, SearchIcon } from '@sheet/ui/icons'
 import { cn } from '@sheet/ui/utils'
-import {
-  AntigravityLogo,
-  ClaudeCodeLogo,
-  CodexLogo,
-  CursorLogo,
-  GithubCopilotLogo,
-  OpenCodeLogo,
-} from './agent-logos'
+import { OpenCodeLogo } from './agent-logos'
 
 export interface ComposerModel {
   value: string
@@ -21,32 +14,9 @@ export interface EffortLevel {
   label: string
 }
 
-function providerLogo(source: string, value: string): React.ReactNode {
-  const id = value.split('/')[0] ?? ''
-  const className = 'size-4 shrink-0'
-  switch (id) {
-    case 'opencode':
-      return <OpenCodeLogo className={className} />
-    case 'cursor':
-      return <CursorLogo className={className} />
-    case 'antigravity':
-      return <AntigravityLogo className={className} />
-    case 'github-copilot':
-      return <GithubCopilotLogo className={className} />
-    case 'anthropic':
-      return <ClaudeCodeLogo className={className} />
-    case 'codex':
-      return <CodexLogo className={className} />
-    default:
-      return (
-        <span
-          aria-hidden="true"
-          className="grid size-4 shrink-0 place-items-center rounded bg-secondary text-[10px] font-medium text-muted-foreground"
-        >
-          {(source || id || '?')[0]!.toUpperCase()}
-        </span>
-      )
-  }
+/** Every model answers through OpenCode: one mark for the whole list. */
+function modelLogo(): React.ReactNode {
+  return <OpenCodeLogo className="size-4 shrink-0" />
 }
 
 /**
@@ -95,22 +65,17 @@ export function ChatComposer({
     if (!open) setQuery('')
   }, [open ])
 
-  const providers = useMemo(() => {
-    const seen = new Map<string, { source: string; sample: string }>()
-    for (const entry of models) {
-      const id = entry.value.split('/')[0] ?? ''
-      if (!seen.has(id)) seen.set(id, { source: entry.source, sample: entry.value })
-    }
-    return [...seen.entries()]
-  }, [models])
-  const [activeProvider, setActiveProvider] = useState<string | null>(null)
-  const provider = activeProvider ?? current?.value.split('/')[0] ?? providers[0]?.[0] ?? null
-  const visible = models.filter((entry) => {
-    if (provider && (entry.value.split('/')[0] ?? '') !== provider) return false
+  const visible = useMemo(() => {
     const text = query.trim().toLowerCase()
-    if (!text) return true
-    return entry.name.toLowerCase().includes(text) || entry.value.toLowerCase().includes(text)
-  })
+    return models.filter((entry) => {
+      if (!text) return true
+      return (
+        entry.name.toLowerCase().includes(text) ||
+        entry.source.toLowerCase().includes(text) ||
+        entry.value.toLowerCase().includes(text)
+      )
+    })
+  }, [models, query])
 
   const send = () => {
     const text = draft.trim()
@@ -139,52 +104,33 @@ export function ChatComposer({
               className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <div className="flex min-h-0 flex-1">
-            <div aria-label="Providers" className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto border-e border-line py-2">
-              {providers.map(([id, info]) => (
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto py-1" role="listbox" aria-label="Models">
+            {visible.map((entry) => {
+              const selected = entry.value === model
+              return (
                 <button
-                  key={id}
+                  key={entry.value}
                   type="button"
-                  title={info.source}
-                  aria-label={info.source}
-                  aria-pressed={(provider ?? '') === id}
-                  onClick={() => setActiveProvider(id)}
-                  className={cn(
-                    'grid size-8 place-items-center rounded-md outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring',
-                    (provider ?? '') === id ? 'bg-secondary text-foreground' : 'text-muted-foreground',
-                  )}
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    onModel(entry.value)
+                    setOpen(null)
+                  }}
+                  className="flex min-w-0 items-center gap-2.5 px-3 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
                 >
-                  {providerLogo(info.source, info.sample)}
+                  {modelLogo()}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-foreground">{entry.name}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{entry.source}</span>
+                  </span>
+                  {selected ? <CheckIcon className="size-3.5 shrink-0 text-foreground" /> : null}
                 </button>
-              ))}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col overflow-y-auto py-1" role="listbox" aria-label="Models">
-              {visible.map((entry) => {
-                const selected = entry.value === model
-                return (
-                  <button
-                    key={entry.value}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    onClick={() => {
-                      onModel(entry.value)
-                      setOpen(null)
-                    }}
-                    className="flex min-w-0 items-center gap-2 px-3 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs text-foreground">{entry.name}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">{entry.source}</span>
-                    </span>
-                    {selected ? <CheckIcon className="size-3.5 shrink-0 text-foreground" /> : null}
-                  </button>
-                )
-              })}
-              {visible.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-muted-foreground">No models match.</p>
-              ) : null}
-            </div>
+              )
+            })}
+            {visible.length === 0 ? (
+              <p className="px-3 py-4 text-xs text-muted-foreground">No models match.</p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -270,7 +216,7 @@ export function ChatComposer({
               open === 'models' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {current ? providerLogo(current.source, current.value) : <OpenCodeLogo className="size-4 shrink-0" />}
+            {modelLogo()}
             <span className="max-w-28 truncate font-medium">{current ? current.name : 'Default model'}</span>
             <ChevronDownIcon className="size-3 shrink-0" />
           </button>

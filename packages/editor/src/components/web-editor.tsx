@@ -2087,21 +2087,46 @@ export function WebCanvasEditor({
   const [rightTab, setRightTab] = useState<'design' | 'comments' | 'chat'>('design')
   const [chatSide, setChatSide] = useState<'left' | 'right'>('left')
   const [chatMode, setChatMode] = useState<'panel' | 'floating'>('panel')
-  const [chatFloatOpen, setChatFloatOpen] = useState(false)
+  const [chatFloatOpen, setChatFloatOpen] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem('sheet:chat-float-open')
+      return raw === null ? true : raw === '1'
+    } catch {
+      return true
+    }
+  })
 
-  useEffect(() => {
-    let cancelled = false
+  const refreshPlacement = useCallback(() => {
     void orpc.preferences
       .get()
       .then((preferences) => {
-        if (cancelled) return
         setChatSide(preferences.chat.side)
         setChatMode(preferences.chat.mode)
       })
       .catch(() => undefined)
-    return () => {
-      cancelled = true
-    }
+  }, [])
+
+  useEffect(() => {
+    refreshPlacement()
+  }, [refreshPlacement])
+
+  useEffect(() => {
+    // Settings lives in another window: coming back here re-reads the
+    // placement so a mode flip shows up without reopening the file.
+    window.addEventListener('focus', refreshPlacement)
+    return () => window.removeEventListener('focus', refreshPlacement)
+  }, [refreshPlacement])
+
+  const toggleFloat = useCallback(() => {
+    setChatFloatOpen((open) => {
+      const next = !open
+      try {
+        window.localStorage.setItem('sheet:chat-float-open', next ? '1' : '0')
+      } catch {
+        // A blocked store never breaks the chat.
+      }
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -2110,8 +2135,9 @@ export function WebCanvasEditor({
   }, [chatSide, leftTab, rightTab])
 
   const openChat = useCallback(() => {
+    refreshPlacement()
     if (chatMode === 'floating') {
-      setChatFloatOpen((open) => !open)
+      toggleFloat()
       return
     }
     if (chatSide === 'right') {
@@ -2121,7 +2147,7 @@ export function WebCanvasEditor({
     }
     setLeftPanelOpen(true)
     setLeftTab('chat')
-  }, [chatMode, chatSide])
+  }, [chatMode, chatSide, refreshPlacement, toggleFloat])
   const [leftWidth, setLeftWidth] = usePanelWidth('sheet:panel-left', 256)
   const [rightWidth, setRightWidth] = usePanelWidth('sheet:panel-right', 288)
   const { comments, create: createComment, resolve: resolveComment, remove: removeComment } = useDesignComments(designId)
