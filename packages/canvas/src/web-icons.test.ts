@@ -50,6 +50,18 @@ describe('web icons', () => {
     expect(iconInfo(outline?.[0])?.library).toBe('runeicons')
   })
 
+  test('a picked collection shows exactly that collection', () => {
+    const fill = searchIcons('battery', 'runeicons', 20, 'fill')
+    expect(fill.length).toBeGreaterThan(0)
+    expect(fill.every((icon) => icon.style === 'fill')).toBe(true)
+    const glass = searchIcons('archive', 'runeicons', 20, 'glass')
+    expect(glass.length).toBeGreaterThan(0)
+    expect(glass.every((icon) => icon.style === 'glass')).toBe(true)
+    // …while browsing unfiltered still lists every icon in its primary style.
+    const mixed = searchIcons('', 'runeicons', 500)
+    expect(new Set(mixed.map((icon) => icon.style)).size).toBeGreaterThan(1)
+  })
+
   test('rune icons fall back to an available collection', () => {
     // Archive 1 ships glass only, so the outline default resolves to glass…
     const match = searchIcons('archive 1', 'runeicons', 20).find((icon) => icon.name === 'Archive 1')

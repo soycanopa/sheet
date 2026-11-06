@@ -167,10 +167,13 @@ const VECTOR_ROOT: Record<string, string> = {
   'stroke-linejoin': 'round',
 }
 
-function buildRuneIndex(style: RuneIconStyle): Map<string, IconEntry> {
+function buildRuneIndex(style: RuneIconStyle | undefined): Map<string, IconEntry> {
   const index = new Map<string, IconEntry>()
   for (const icon of RuneIconsData) {
-    const effective = runeStyleOf(icon, style)
+    // A picked collection shows exactly that collection: no silent fallback
+    // to another drawing. Without a pick, each icon shows its primary style
+    // so browsing still lists the whole set.
+    const effective = style ?? runeStyleOf(icon, DEFAULT_RUNE_STYLE)
     const type = RUNE_STYLES.find((entry) => entry.id === effective)!.type
     const variant = icon.variants[type]
     if (!variant) continue
@@ -200,11 +203,11 @@ function buildVectorIndex(library: Exclude<IconLibrary, 'runeicons'>): Map<strin
 }
 
 function iconIndex(library: IconLibrary, style?: RuneIconStyle): Map<string, IconEntry> {
-  const key = library === 'runeicons' ? `runeicons::${style ?? DEFAULT_RUNE_STYLE}` : library
+  const key = library === 'runeicons' ? `runeicons::${style ?? 'mixed'}` : library
   const cached = indexes.get(key)
   if (cached) return cached
   const index = library === 'runeicons'
-    ? buildRuneIndex(style ?? DEFAULT_RUNE_STYLE)
+    ? buildRuneIndex(style)
     : buildVectorIndex(library)
   indexes.set(key, index)
   return index
@@ -238,10 +241,13 @@ export function iconCount(library: IconLibrary) {
 /** Path data for previews; the same tree the inserted svg is built from. */
 export function iconData(library: IconLibrary, name: string, style?: RuneIconStyle) {
   const index = iconIndex(library, style)
-  if (library === 'runeicons') {
-    return index.get(`${normalize(name)}::${style ?? DEFAULT_RUNE_STYLE}`) ?? null
+  if (library !== 'runeicons') return index.get(normalize(name)) ?? null
+  if (style) return index.get(`${normalize(name)}::${style}`) ?? null
+  const prefix = `${normalize(name)}::`
+  for (const [key, entry] of index) {
+    if (key.startsWith(prefix)) return entry
   }
-  return index.get(normalize(name)) ?? null
+  return null
 }
 
 const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
