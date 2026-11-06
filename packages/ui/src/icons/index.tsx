@@ -313,6 +313,7 @@ export const SlidersHorizontalIcon = createIcon(
   'SlidersHorizontalIcon',
 )
 export const SquareIcon = createIcon(HugeSquareIcon, 'SquareIcon')
+export const StarIcon = createIcon(HugeStarIcon, 'StarIcon')
 export const StretchHorizontalIcon = createIcon(
   HugeStretchHorizontalIcon,
   'StretchHorizontalIcon',
