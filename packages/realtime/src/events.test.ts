@@ -73,4 +73,29 @@ describe('parseCanvasRealtimeEvent', () => {
     )
     expect(event).toBeNull()
   })
+
+  test('accepts a chat.delta event and caps its text', () => {
+    const event = parseCanvasRealtimeEvent(
+      JSON.stringify({
+        type: 'chat.delta',
+        sessionId: 'chat-1',
+        seq: 3,
+        kind: 'text',
+        text: 'hello',
+        sentAt: Date.now(),
+      }),
+    )
+    expect(event).not.toBeNull()
+    expect(event?.type).toBe('chat.delta')
+    if (event?.type !== 'chat.delta') return
+    expect(event.text).toBe('hello')
+    expect(event.usage).toBeNull()
+  })
+
+  test('rejects a chat.delta event with an unknown kind', () => {
+    const event = parseCanvasRealtimeEvent(
+      JSON.stringify({ type: 'chat.delta', sessionId: 'chat-1', seq: 0, kind: 'dance', sentAt: Date.now() }),
+    )
+    expect(event).toBeNull()
+  })
 })

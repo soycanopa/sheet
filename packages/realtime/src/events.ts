@@ -69,6 +69,18 @@ export type CanvasRealtimeEvent =
       status: string | null
       sentAt: number
     }
+  | {
+      type: 'chat.delta'
+      sessionId: string
+      seq: number
+      kind: 'text' | 'thinking' | 'tool' | 'usage' | 'done' | 'error'
+      text?: string
+      tool?: string
+      stopReason?: string | null
+      usage?: { inputTokens: number; outputTokens: number } | null
+      message?: string | null
+      sentAt: number
+    }
 
 export type CanvasRealtimeEventInput =
   | Omit<Extract<CanvasRealtimeEvent, { type: 'canvas.changed' }>, 'sentAt'>
@@ -76,6 +88,7 @@ export type CanvasRealtimeEventInput =
   | Omit<Extract<CanvasRealtimeEvent, { type: 'presence.peer' }>, 'sentAt'>
   | Omit<Extract<CanvasRealtimeEvent, { type: 'presence.state' }>, 'sentAt'>
   | Omit<Extract<CanvasRealtimeEvent, { type: 'branch.changed' }>, 'sentAt'>
+  | Omit<Extract<CanvasRealtimeEvent, { type: 'chat.delta' }>, 'sentAt'>
 
 /**
  * The channel a document's events travel on. Keyed by the owner rather than the
@@ -257,6 +270,43 @@ export function parseCanvasRealtimeEvent(
       type: 'branch.changed',
       draftId: parsed.draftId === null ? null : stringValue(parsed.draftId),
       status: parsed.status === null ? null : stringValue(parsed.status),
+      sentAt,
+    }
+  }
+  if (
+    parsed.type === 'chat.delta' &&
+    typeof parsed.sessionId === 'string' &&
+    parsed.sessionId.length > 0 &&
+    parsed.sessionId.length <= 128 &&
+    Number.isInteger(parsed.seq) &&
+    Number(parsed.seq) >= 0 &&
+    (parsed.kind === 'text' ||
+      parsed.kind === 'thinking' ||
+      parsed.kind === 'tool' ||
+      parsed.kind === 'usage' ||
+      parsed.kind === 'done' ||
+      parsed.kind === 'error')
+  ) {
+    const text = stringValue(parsed.text)
+    const tool = stringValue(parsed.tool)
+    const message = stringValue(parsed.message)
+    const stopReason = stringValue(parsed.stopReason)
+    const usage = record(parsed.usage)
+      ? {
+          inputTokens: finiteNumber(parsed.usage.inputTokens) ?? 0,
+          outputTokens: finiteNumber(parsed.usage.outputTokens) ?? 0,
+        }
+      : null
+    return {
+      type: 'chat.delta',
+      sessionId: parsed.sessionId,
+      seq: Number(parsed.seq),
+      kind: parsed.kind,
+      text: text && text.length <= 20_000 ? text : undefined,
+      tool: tool && tool.length <= 200 ? tool : undefined,
+      stopReason: stopReason && stopReason.length <= 100 ? stopReason : null,
+      usage,
+      message: message && message.length <= 500 ? message : null,
       sentAt,
     }
   }
