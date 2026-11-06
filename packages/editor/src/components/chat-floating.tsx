@@ -11,6 +11,33 @@ export interface FloatSession {
   busy: boolean
 }
 
+const FLOAT_SIZE_KEY = 'sheet:chat-float-size'
+const FLOAT_MIN_W = 340
+const FLOAT_MIN_H = 380
+const FLOAT_DEFAULT_SIZE = { w: 560, h: 480 }
+
+export interface FloatSize {
+  w: number
+  h: number
+}
+
+function loadFloatSize(): FloatSize {
+  try {
+    const raw = window.localStorage.getItem(FLOAT_SIZE_KEY)
+    if (!raw) return FLOAT_DEFAULT_SIZE
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return FLOAT_DEFAULT_SIZE
+    const { w, h } = parsed as { w?: unknown; h?: unknown }
+    if (typeof w !== 'number' || typeof h !== 'number') return FLOAT_DEFAULT_SIZE
+    return {
+      w: Math.max(FLOAT_MIN_W, Math.round(w)),
+      h: Math.max(FLOAT_MIN_H, Math.round(h)),
+    }
+  } catch {
+    return FLOAT_DEFAULT_SIZE
+  }
+}
+
 /** Short relative stamp for the rail (`5h ago`), English like the UI. */
 export function chatTimeAgo(updatedAt: number, now: number = Date.now()): string {
   const seconds = Math.max(0, Math.floor((now - updatedAt) / 1000))
@@ -44,6 +71,7 @@ export function ChatFloating({
 }) {
   const [sessions, setSessions] = useState<FloatSession[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
+  const [size, setSize] = useState<FloatSize>(loadFloatSize)
 
   useEffect(() => {
     if (!open) return
@@ -127,11 +155,39 @@ export function ChatFloating({
     })()
   }
 
+  const onResizePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    const origin = { x: event.clientX, y: event.clientY, w: size.w, h: size.h }
+    const onMove = (move: PointerEvent) => {
+      setSize({
+        w: Math.max(FLOAT_MIN_W, Math.round(origin.w + move.clientX - origin.x)),
+        h: Math.max(FLOAT_MIN_H, Math.round(origin.h + move.clientY - origin.y)),
+      })
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setSize((current) => {
+        try {
+          window.localStorage.setItem(FLOAT_SIZE_KEY, JSON.stringify(current))
+        } catch {
+          // A blocked store never breaks the chat.
+        }
+        return current
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   return (
     <div
       data-chat-floating="true"
+      data-testid="chat-float-window"
+      style={{ width: size.w, height: size.h }}
       className={cn(
-        'pointer-events-auto absolute bottom-3 left-3 z-30 flex h-[480px] max-h-[calc(100%-1.5rem)] w-[560px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface text-foreground shadow-panel-lg',
+        'pointer-events-auto absolute bottom-3 left-3 z-30 flex max-h-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface text-foreground shadow-panel-lg',
         className,
       )}
     >
@@ -201,6 +257,16 @@ export function ChatFloating({
             <p className="px-3 py-4 text-xs text-muted-foreground">Opening chat…</p>
           )}
         </div>
+      </div>
+      <div
+        role="separator"
+        aria-label="Resize chat"
+        aria-orientation="horizontal"
+        title="Resize"
+        onPointerDown={onResizePointerDown}
+        className="absolute bottom-0.5 right-0.5 z-10 size-5 cursor-nwse-resize touch-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span aria-hidden="true" className="absolute bottom-1 right-1 block h-2.5 w-2.5 rounded-br border-b-2 border-r-2 border-muted-foreground/70" />
       </div>
     </div>
   )

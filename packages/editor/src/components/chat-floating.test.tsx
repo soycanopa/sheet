@@ -48,7 +48,10 @@ describe('ChatFloating', () => {
     list.mockResolvedValue({ sessions: [] })
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => {
+    cleanup()
+    window.localStorage.removeItem('sheet:chat-float-size')
+  })
 
   test('collapses to a pill that reopens the window', async () => {
     const onOpenChange = vi.fn()
@@ -65,6 +68,20 @@ describe('ChatFloating', () => {
     expect(selected.textContent).toContain('New chat')
     expect(get).toHaveBeenCalledWith({ sessionId: 'chat-1' })
     expect(await screen.findByText('Hello Duma')).toBeTruthy()
+  })
+
+  test('resizes from the corner handle and remembers the size', async () => {
+    render(<ChatFloating designId="design-1" open={true} onOpenChange={() => undefined} />)
+    await screen.findByText('Chats')
+    const window_ = screen.getByTestId('chat-float-window')
+    expect(window_.style.width).toBe('560px')
+    const handle = screen.getByRole('separator', { name: 'Resize chat' })
+    fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 200 })
+    fireEvent.pointerMove(window, { clientX: 260, clientY: 240 })
+    fireEvent.pointerUp(window)
+    expect(window_.style.width).toBe('620px')
+    expect(window_.style.height).toBe('520px')
+    expect(window.localStorage.getItem('sheet:chat-float-size')).toBe('{"w":620,"h":520}')
   })
 
   test('collapses from the header control', async () => {
