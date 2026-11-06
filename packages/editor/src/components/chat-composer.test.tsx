@@ -33,7 +33,10 @@ function composer(props: Partial<React.ComponentProps<typeof ChatComposer>> = {}
 }
 
 describe('ChatComposer', () => {
-  afterEach(() => cleanup())
+  afterEach(() => {
+    cleanup()
+    window.localStorage.removeItem('sheet:favorite-models')
+  })
 
   test('lists every model with its short name over its provider', () => {
     composer()
@@ -64,6 +67,37 @@ describe('ChatComposer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Effort' }))
     fireEvent.click(screen.getByRole('option', { name: 'High' }))
     expect(onEffort).toHaveBeenCalledWith('high')
+  })
+
+  test('shows OpenCode and Favorites tabs over the catalog', () => {
+    composer()
+    fireEvent.click(screen.getByRole('button', { name: 'Model' }))
+    const tabs = screen.getByRole('tablist', { name: 'Model sources' })
+    expect(tabs.textContent).toMatch('OpenCode')
+    expect(tabs.textContent).toMatch('Favorites')
+    // The OpenCode tab lists the whole catalog.
+    expect(screen.getByRole('option', { name: /Grok 4\.7/ })).toBeTruthy()
+    expect(screen.getByRole('option', { name: /V4 Pro/ })).toBeTruthy()
+  })
+
+  test('stars a model into the Favorites tab and keeps it across opens', () => {
+    composer()
+    fireEvent.click(screen.getByRole('button', { name: 'Model' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Star DeepSeek V4 Pro' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Favorites' }))
+    expect(screen.getByRole('option', { name: /V4 Pro/ })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: /Grok/ })).toBeNull()
+    // Unstarred models stay out even when searching.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'grok' } })
+    expect(screen.queryByRole('option', { name: /Grok/ })).toBeNull()
+    expect(screen.getByText('No models match.')).toBeTruthy()
+  })
+
+  test('starts the Favorites tab empty with a starring hint', () => {
+    composer()
+    fireEvent.click(screen.getByRole('button', { name: 'Model' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Favorites' }))
+    expect(screen.getByText(/Star a model to pin it here/)).toBeTruthy()
   })
 
   test('sends on Enter and offers the connect command', () => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpIcon, CheckIcon, ChevronDownIcon, SearchIcon } from '@sheet/ui/icons'
+import { ArrowUpIcon, CheckIcon, ChevronDownIcon, SearchIcon, StarIcon } from '@sheet/ui/icons'
 import { cn } from '@sheet/ui/utils'
 import { OpenCodeLogo } from './agent-logos'
 
@@ -14,6 +14,32 @@ export interface EffortLevel {
   label: string
 }
 
+/**
+ * Tabs of the model popup. Every model answers through OpenCode today, so the
+ * first tab holds the whole catalog and Favorites pins the ones in use; later
+ * providers arrive as more entries here, not as a new popup.
+ */
+export const MODEL_TABS = [
+  { id: 'opencode', label: 'OpenCode' },
+  { id: 'favorites', label: 'Favorites' },
+] as const
+
+export type ModelTab = (typeof MODEL_TABS)[number]['id']
+
+const FAVORITE_MODELS_KEY = 'sheet:favorite-models'
+
+function loadFavoriteModels(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(FAVORITE_MODELS_KEY)
+    if (!raw) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((entry): entry is string => typeof entry === 'string'))
+  } catch {
+    return new Set()
+  }
+}
+
 /** Every model answers through OpenCode: one mark for the whole list. */
 function modelLogo(): React.ReactNode {
   return <OpenCodeLogo className="size-4 shrink-0" />
@@ -22,7 +48,8 @@ function modelLogo(): React.ReactNode {
 /**
  * The chat composer, in the shape of Fountible's input: the question on top
  * with the send button, the model and effort pills underneath, and a model
- * popup with providers on the left rail and short names on the right.
+ * popup with tabs (OpenCode, Favorites) over short names with the provider
+ * underneath.
  */
 export function ChatComposer({
   models,
@@ -48,6 +75,8 @@ export function ChatComposer({
   const [draft, setDraft] = useState('')
   const [open, setOpen] = useState<'models' | 'effort' | null>(null)
   const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<ModelTab>('opencode')
+  const [favorites, setFavorites] = useState<Set<string>>(loadFavoriteModels)
   const [copied, setCopied] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const current = models.find((entry) => entry.value === model) ?? null
@@ -65,9 +94,24 @@ export function ChatComposer({
     if (!open) setQuery('')
   }, [open ])
 
+  const toggleFavorite = (value: string) => {
+    setFavorites((previous) => {
+      const next = new Set(previous)
+      if (next.has(value)) next.delete(value)
+      else next.add(value)
+      try {
+        window.localStorage.setItem(FAVORITE_MODELS_KEY, JSON.stringify([...next]))
+      } catch {
+        // A blocked store never breaks the picker.
+      }
+      return next
+    })
+  }
+
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase()
     return models.filter((entry) => {
+      if (tab === 'favorites' && !favorites.has(entry.value)) return false
       if (!text) return true
       return (
         entry.name.toLowerCase().includes(text) ||
@@ -75,7 +119,7 @@ export function ChatComposer({
         entry.value.toLowerCase().includes(text)
       )
     })
-  }, [models, query])
+  }, [models, query, tab, favorites])
 
   const send = () => {
     const text = draft.trim()
@@ -104,32 +148,80 @@ export function ChatComposer({
               className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
             />
           </div>
+          <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 py-1" role="tablist" aria-label="Model sources">
+            {MODEL_TABS.map((entry) => {
+              const selected = entry.id === tab
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setTab(entry.id)}
+                  className={cn(
+                    'rounded-md px-2 py-1 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                    selected ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {entry.label}
+                </button>
+              )
+            })}
+          </div>
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto py-1" role="listbox" aria-label="Models">
             {visible.map((entry) => {
               const selected = entry.value === model
+              const starred = favorites.has(entry.value)
               return (
-                <button
+                <div
                   key={entry.value}
-                  type="button"
                   role="option"
+                  tabIndex={0}
                   aria-selected={selected}
                   onClick={() => {
                     onModel(entry.value)
                     setOpen(null)
                   }}
-                  className="flex min-w-0 items-center gap-2.5 px-3 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onModel(entry.value)
+                      setOpen(null)
+                    }
+                  }}
+                  className="flex min-w-0 cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
                 >
                   {modelLogo()}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs text-foreground">{entry.name}</span>
                     <span className="block truncate text-[11px] text-muted-foreground">{entry.source}</span>
                   </span>
+                  <button
+                    type="button"
+                    aria-label={starred ? `Unstar ${entry.name}` : `Star ${entry.name}`}
+                    aria-pressed={starred}
+                    title={starred ? 'Remove from Favorites' : 'Add to Favorites'}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleFavorite(entry.value)
+                    }}
+                    className={cn(
+                      'grid size-6 shrink-0 place-items-center rounded-md outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring',
+                      starred ? 'text-cx-accent' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <StarIcon className={cn('size-3.5', starred && 'fill-current')} />
+                  </button>
                   {selected ? <CheckIcon className="size-3.5 shrink-0 text-foreground" /> : null}
-                </button>
+                </div>
               )
             })}
             {visible.length === 0 ? (
-              <p className="px-3 py-4 text-xs text-muted-foreground">No models match.</p>
+              <p className="px-3 py-4 text-xs text-muted-foreground">
+                {tab === 'favorites' && !query.trim()
+                  ? 'No favorites yet. Star a model to pin it here.'
+                  : 'No models match.'}
+              </p>
             ) : null}
           </div>
           <button
