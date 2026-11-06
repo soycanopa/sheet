@@ -10,11 +10,13 @@ import {
 import { serializeWebStylesheets } from '@sheet/canvas/web-css'
 import {
   ICON_LIBRARIES,
+  RUNE_STYLES,
   iconNodes,
   iconStyleOperation,
   isIconNode,
   searchIcons,
   type IconLibrary,
+  type RuneIconStyle,
 } from '@sheet/canvas/web-icons'
 import {
   DEFAULT_PAGE_HEIGHT,
@@ -157,7 +159,10 @@ function withoutDocument<T extends { document?: unknown }>(result: T) {
 
 const iconLibrary = z
   .enum(ICON_LIBRARIES.map((entry) => entry.id) as [IconLibrary, ...IconLibrary[]])
-  .describe('Icon set: hugeicons or lucide')
+  .describe('Icon set: hugeicons, lucide, or runeicons')
+const runeStyle = z
+  .enum(RUNE_STYLES.map((entry) => entry.id) as [RuneIconStyle, ...RuneIconStyle[]])
+  .describe('RuneIcons collection: outline, duotone, fill, pixel, or glass')
 /**
  * Where an icon goes when the agent names no parent. On a named page that is
  * the page root, as always. Page 1 has no root: with one top-level frame the
@@ -749,16 +754,17 @@ function createSheetRuntime(
     'searchIcons',
     {
       description:
-        'Search the supported icon libraries (hugeicons, lucide) by name. Omit library to search all. Use the returned library and name with insertIcon.',
+        'Search the supported icon libraries (hugeicons, lucide, runeicons) by name. Omit library to search all. Use the returned library and name with insertIcon.',
       inputSchema: {
         query: z.string().max(80).default('').describe('Name fragment, for example "arrow" or "heart"'),
         library: iconLibrary.optional(),
         limit: z.number().int().min(1).max(100).default(20),
+        style: runeStyle.optional().describe('RuneIcons collection to search; defaults to outline'),
       },
       annotations: { readOnlyHint: true },
     },
-    tool('searchIcons', async (args: { query: string; library?: IconLibrary; limit: number }) =>
-      searchIcons(args.query, args.library, args.limit),
+    tool('searchIcons', async (args: { query: string; library?: IconLibrary; limit: number; style?: RuneIconStyle }) =>
+      searchIcons(args.query, args.library, args.limit, args.style),
     ),
   )
 
@@ -773,6 +779,7 @@ function createSheetRuntime(
         name: z.string().min(1).max(80).describe('Icon name from searchIcons'),
         parentId: z.string().min(1).max(200).optional().describe('Element to insert into; defaults to the page root'),
         pageId: pageIdShape,
+        style: runeStyle.optional().describe('RuneIcons collection; use the style searchIcons returned'),
         ...iconStyleShape,
       },
     },
@@ -783,6 +790,7 @@ function createSheetRuntime(
       name: string
       parentId?: string
       pageId?: string
+      style?: RuneIconStyle
       color?: string
       size?: number
       strokeWidth?: number
@@ -804,6 +812,7 @@ function createSheetRuntime(
         color: args.color,
         size: args.size,
         strokeWidth: args.strokeWidth,
+        ...(args.style ? { style: args.style } : {}),
         ...(spot ? { left: spot.x, top: spot.y } : {}),
       })
       if (!nodes) {

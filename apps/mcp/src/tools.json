@@ -567,7 +567,7 @@
   },
   {
     "name": "searchIcons",
-    "description": "Search the supported icon libraries (hugeicons, lucide) by name. Omit library to search all. Use the returned library and name with insertIcon.",
+    "description": "Search the supported icon libraries (hugeicons, lucide, runeicons) by name. Omit library to search all. Use the returned library and name with insertIcon.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -581,15 +581,27 @@
           "type": "string",
           "enum": [
             "hugeicons",
-            "lucide"
+            "lucide",
+            "runeicons"
           ],
-          "description": "Icon set: hugeicons or lucide"
+          "description": "Icon set: hugeicons, lucide, or runeicons"
         },
         "limit": {
           "default": 20,
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "style": {
+          "description": "RuneIcons collection to search; defaults to outline",
+          "type": "string",
+          "enum": [
+            "outline",
+            "duotone",
+            "fill",
+            "pixel",
+            "glass"
+          ]
         }
       },
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -620,9 +632,10 @@
           "type": "string",
           "enum": [
             "hugeicons",
-            "lucide"
+            "lucide",
+            "runeicons"
           ],
-          "description": "Icon set: hugeicons or lucide"
+          "description": "Icon set: hugeicons, lucide, or runeicons"
         },
         "name": {
           "type": "string",
@@ -641,6 +654,17 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200
+        },
+        "style": {
+          "description": "RuneIcons collection; use the style searchIcons returned",
+          "type": "string",
+          "enum": [
+            "outline",
+            "duotone",
+            "fill",
+            "pixel",
+            "glass"
+          ]
         },
         "color": {
           "description": "Any CSS color; icons draw in currentColor",
