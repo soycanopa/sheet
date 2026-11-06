@@ -237,6 +237,29 @@ export const userPreferences = sqliteTable('user_preferences', {
     .notNull(),
 })
 
+/**
+ * The internal chat's sessions. The live OpenCode process is not persisted —
+ * a restart respawns it on demand — but the thread is: preview, model,
+ * effort, and the capped transcript survive, so the rail still lists every
+ * chat and reopening one keeps its history. Deleting a session removes its
+ * row for good.
+ */
+export const chatSession = sqliteTable(
+  'chat_session',
+  {
+    id: text('id').primaryKey(),
+    designId: text('design_id').notNull(),
+    model: text('model'),
+    effort: text('effort').default('auto').notNull(),
+    preview: text('preview').default('').notNull(),
+    transcript: text('transcript').default('[]').notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .$defaultFn(now)
+      .notNull(),
+  },
+  (table) => [index('chat_session_design_id_idx').on(table.designId, table.updatedAt)],
+)
+
 export type CommentAuthor = 'user' | 'agent'
 
 /**

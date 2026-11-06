@@ -34,5 +34,11 @@ export const migrations: ReadonlyArray<{
     "when": 1793934848545,
     "breakpoints": true,
     "sql": "ALTER TABLE `user_preferences` ADD `chat_side` text DEFAULT 'left' NOT NULL;--> statement-breakpoint\nALTER TABLE `user_preferences` ADD `chat_mode` text DEFAULT 'panel' NOT NULL;"
+  },
+  {
+    "tag": "0005_empty_norrin_radd",
+    "when": 1793936587401,
+    "breakpoints": true,
+    "sql": "CREATE TABLE `chat_session` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`design_id` text NOT NULL,\n\t`model` text,\n\t`effort` text DEFAULT 'auto' NOT NULL,\n\t`preview` text DEFAULT '' NOT NULL,\n\t`transcript` text DEFAULT '[]' NOT NULL,\n\t`updated_at` integer NOT NULL\n);\n--> statement-breakpoint\nCREATE INDEX `chat_session_design_id_idx` ON `chat_session` (`design_id`,`updated_at`);"
   }
 ]
