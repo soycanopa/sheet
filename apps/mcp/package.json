@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "chat:spike": "bun run src/chat/chat-spike.ts",
+    "chat:canvas": "bun --env-file=../../.env run src/chat/chat-canvas.ts",
     "dev": "bun --env-file=../../.env run src/local.ts",
     "dev:stdio": "bun --env-file=../../.env run src/stdio.ts",
     "build:server": "bun run --cwd ../../packages/db embed && bun build --compile src/local.ts --outfile dist/sheet-server",
