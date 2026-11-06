@@ -9,20 +9,21 @@
  * proves the wire, not tool execution.
  */
 
-import { locateCli, startSession } from './opencode-session'
+import { locateOpenCodeCli, startOpenCodeSession } from '@sheet/rpc/chat/opencode-session'
 
 const promptText = Bun.argv.slice(2).join(' ').trim() || 'Responde en una línea: ¿qué modelo eres?'
 const log = (line: string) => console.error(line)
 
-const cli = await locateCli(log)
+const cli = await locateOpenCodeCli(log)
 if (!cli) {
   console.error('[spike] no OpenCode 2 CLI found (looked for opencode2/opencode on PATH dirs and the OpenCode app copy)')
   process.exit(1)
 }
 
 let streamed = ''
-const { acp, sessionId, agentName, close } = await startSession({
+const { acp, sessionId, agentName, close } = await startOpenCodeSession({
   cli,
+  designId: 'spike',
   mcpServers: [],
   onUpdate: (_sessionId, update) => {
     const text = (update as { content?: { text?: unknown } }).content?.text

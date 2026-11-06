@@ -11,27 +11,8 @@
  * a later slice, through the same transaction vocabulary as the editor.
  */
 
-import { locateCli, startSession } from './opencode-session'
-
-/** Sheet MCP tools with no write path. Everything else is denied for now. */
-const READ_ONLY_TOOLS = new Set([
-  'getUsage',
-  'listDesigns',
-  'getWebDocument',
-  'getWebHTML',
-  'getWebCSS',
-  'getWebScreenshot',
-  'exportDesign',
-  'listBranches',
-  'compareBranch',
-  'listVersions',
-  'searchIcons',
-  'listPages',
-  'listFramePresets',
-  'listShaders',
-  'listComments',
-  'listAssets',
-])
+import { isChatReadOnlyTool } from '@sheet/rpc/chat/opencode'
+import { locateOpenCodeCli, startOpenCodeSession } from '@sheet/rpc/chat/opencode-session'
 
 function toolCallName(toolCall: unknown): string {
   if (typeof toolCall !== 'object' || toolCall === null) return ''
@@ -39,18 +20,14 @@ function toolCallName(toolCall: unknown): string {
   return typeof call.name === 'string' ? call.name : typeof call.title === 'string' ? call.title : ''
 }
 
-/** MCP tool calls arrive namespaced; match on the trailing tool name. */
-function isReadOnly(name: string): boolean {
-  const tail = name.split(/[:_]+/).pop() ?? name
-  return READ_ONLY_TOOLS.has(tail)
-}
+const isReadOnly = isChatReadOnlyTool
 
 const promptText =
   Bun.argv.slice(2).join(' ').trim() ||
   'Usa listDesigns para ver los diseños y getWebDocument para describir el contenido del primero. No modifiques nada.'
 const log = (line: string) => console.error(line)
 
-const cli = await locateCli(log)
+const cli = await locateOpenCodeCli(log)
 if (!cli) {
   console.error('[canvas] no OpenCode 2 CLI found')
   process.exit(1)
@@ -67,7 +44,8 @@ try {
 }
 console.error(`[canvas] attaching MCP ${mcpUrl}`)
 
-const { acp, sessionId, agentName, close } = await startSession({
+const { acp, sessionId, agentName, close } = await startOpenCodeSession({
+  designId: 'spike',
   cli,
   mcpServers: [{ type: 'http', name: 'sheet', url: mcpUrl, headers: [] }],
   onUpdate: (_sessionId, update) => {
