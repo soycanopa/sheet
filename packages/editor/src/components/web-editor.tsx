@@ -3385,7 +3385,7 @@ export function WebCanvasEditor({
     const stage = stageRef.current
     if (!stage) return
     const onWheel = (event: WheelEvent) => {
-      if (event.target instanceof Element && event.target.closest('[role="toolbar"]')) return
+      if (event.target instanceof Element && event.target.closest('[role="toolbar"], [data-chat-floating]')) return
       event.preventDefault()
       const current = cameraRef.current
       if (event.ctrlKey || event.metaKey) {
