@@ -41,6 +41,8 @@ import {
 } from '@sheet/ui/icons'
 import { ChatFloating } from './chat-floating'
 import { ChatPanel } from './chat-panel'
+import { IconsPopover } from './icons-popover'
+import { SHEET_ICON_MIME, parseIconDrag } from './icon-panel'
 import { ConnectAgent } from './connect-agent'
 import { FramePresetsPanel } from './frame-presets-panel'
 import { frameNode, freeFrameSpot, NEW_FRAME_SIZE, type FramePreset } from '@sheet/canvas/web-frames'
@@ -59,7 +61,7 @@ import {
 } from './inspector-controls'
 import { ShaderGallery } from './shader-panel'
 import { documentFonts, firstFamily, SYSTEM_FONT_STACKS, type DocumentFont } from '../lib/fonts'
-import { iconInfo, iconStyleOperation, isIconNode, type IconLibrary } from '@sheet/canvas/web-icon-style'
+import { iconInfo, iconStyleOperation, isIconNode, type IconLibrary, type RuneIconStyle } from '@sheet/canvas/web-icon-style'
 import { isShaderNode, prewarmShaderThumbnails, shaderInfo, shaderNode, shaderPatchOperation, type ShaderName } from '@sheet/canvas/web-shaders'
 import { Button } from '@sheet/ui/button'
 import { cn } from '@sheet/ui/utils'
@@ -2086,6 +2088,7 @@ export function WebCanvasEditor({
   const [leftTab, setLeftTab] = useState<'layers' | 'components' | 'fonts' | 'assets' | 'theme' | 'chat'>('layers')
   const [assetsKind, setAssetsKind] = useState<'images' | 'icons'>('images')
   const [rightTab, setRightTab] = useState<'design' | 'comments' | 'chat'>('design')
+  const [iconsOpen, setIconsOpen] = useState(false)
   const [chatSide, setChatSide] = useState<'left' | 'right'>('left')
   const [chatMode, setChatMode] = useState<'panel' | 'floating'>('panel')
   const [chatFloatOpen, setChatFloatOpen] = useState(() => {
@@ -2661,14 +2664,15 @@ export function WebCanvasEditor({
     transact(`Insert <${tag}>`, operations)
   }, [transact])
 
-  const insertLibraryIcon = useCallback(async (icon: { library: IconLibrary; name: string }) => {
+  const insertLibraryIcon = useCallback(async (icon: { library: IconLibrary; name: string; style?: RuneIconStyle }, at?: { parentId: string | null; x: number; y: number }, reveal = true) => {
     const { iconNodes } = await import('@sheet/canvas/web-icons')
-    const place = placeInsert(24, 24)
+    const place = at ?? placeInsert(24, 24)
     const nodes = iconNodes(icon.library, icon.name, {
       parentId: place.parentId,
       order: nextOrder(documentRef.current, place.parentId),
       left: place.x,
       top: place.y,
+      ...(icon.style ? { style: icon.style } : {}),
     })
     const svg = nodes?.[0]
     if (!nodes || !svg) {
@@ -2680,7 +2684,7 @@ export function WebCanvasEditor({
     setPageSelected(false)
     transact(`Insert ${icon.name} icon`, nodes.map((node) => ({ type: 'node.insert' as const, node })))
     setTool('select')
-    setLeftTab('layers')
+    if (reveal) setLeftTab('layers')
   }, [placeInsert, setTool, transact])
 
   const selectionColors = useMemo(() => {
@@ -3386,7 +3390,7 @@ export function WebCanvasEditor({
     const stage = stageRef.current
     if (!stage) return
     const onWheel = (event: WheelEvent) => {
-      if (event.target instanceof Element && event.target.closest('[role="toolbar"], [data-chat-floating]')) return
+      if (event.target instanceof Element && event.target.closest('[role="toolbar"], [data-chat-floating], [data-icon-popover]')) return
       event.preventDefault()
       const current = cameraRef.current
       if (event.ctrlKey || event.metaKey) {
@@ -3799,12 +3803,8 @@ export function WebCanvasEditor({
       <WebToolButton
         label="Icon library"
         aria-label="Icon library"
-        active={leftPanelOpen && leftTab === 'assets' && assetsKind === 'icons'}
-        onClick={() => {
-          setLeftPanelOpen(true)
-          setLeftTab('assets')
-          setAssetsKind('icons')
-        }}
+        active={iconsOpen}
+        onClick={() => setIconsOpen((open) => !open)}
       >
         <ComponentIcon className="size-4" />
       </WebToolButton>
@@ -4176,6 +4176,26 @@ export function WebCanvasEditor({
             ) suppressClickRef.current = true
             finishElementDrag(event)
           }}
+          onDragOver={(event) => {
+            if (Array.from(event.dataTransfer.types).includes(SHEET_ICON_MIME)) {
+              event.preventDefault()
+              event.dataTransfer.dropEffect = 'copy'
+            }
+          }}
+          onDrop={(event) => {
+            const raw = event.dataTransfer.getData(SHEET_ICON_MIME)
+            const pick = raw ? parseIconDrag(raw) : null
+            if (!pick) return
+            event.preventDefault()
+            // Drops land top level, centered on the cursor: icons are free
+            // objects, so the person can drag them into a frame afterwards.
+            const point = canvasPoint({ clientX: event.clientX, clientY: event.clientY, currentTarget: event.currentTarget })
+            void insertLibraryIcon(
+              pick,
+              { parentId: canvasParentId(pageIdRef.current), x: Math.max(0, point.x - 12), y: Math.max(0, point.y - 12) },
+              false,
+            )
+          }}
           onPointerCancel={(event) => { finishDrawing(event, true); finishPan(event); finishElementDrag(event) }}
           onClick={(event) => {
             if (suppressClickRef.current) {
@@ -4232,6 +4252,14 @@ export function WebCanvasEditor({
               {toolButtons}
             </div>
           )}
+          {iconsOpen ? (
+            <IconsPopover
+              onInsert={(pick) => {
+                void insertLibraryIcon(pick, undefined, false)
+              }}
+              onClose={() => setIconsOpen(false)}
+            />
+          ) : null}
 
           {/* Rendered Document View */}
           <div
