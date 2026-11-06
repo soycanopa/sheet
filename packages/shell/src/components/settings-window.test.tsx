@@ -22,7 +22,7 @@ describe('SettingsWindow sections', () => {
     render(<SettingsWindow />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Agents' }))
-    expect(await screen.findByRole('switch', { name: 'Internal chat' })).toBeTruthy()
+    expect(await screen.findByRole('switch', { name: 'Duma' })).toBeTruthy()
     expect(screen.getByText('Providers')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'MCP' }))

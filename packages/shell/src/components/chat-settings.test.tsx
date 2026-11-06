@@ -30,7 +30,7 @@ describe('InternalChatSettings', () => {
 
   test('loads off and saves the flip', async () => {
     render(<InternalChatSettings />)
-    const toggle = await screen.findByRole('switch', { name: 'Internal chat' })
+    const toggle = await screen.findByRole('switch', { name: 'Duma' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
 
     fireEvent.click(toggle)
@@ -42,7 +42,7 @@ describe('InternalChatSettings', () => {
 
   test('saves the panel side and floating mode', async () => {
     render(<InternalChatSettings />)
-    await screen.findByRole('switch', { name: 'Internal chat' })
+    await screen.findByRole('switch', { name: 'Duma' })
     fireEvent.click(screen.getByRole('radio', { name: 'Right' }))
     await waitFor(() =>
       expect(save).toHaveBeenCalledWith({ chat: { enabled: false, provider: 'opencode', side: 'right', mode: 'panel' } }),
@@ -62,7 +62,7 @@ describe('InternalChatSettings', () => {
   test('reverts and warns when saving fails', async () => {
     save.mockRejectedValueOnce(new Error('down'))
     render(<InternalChatSettings />)
-    const toggle = await screen.findByRole('switch', { name: 'Internal chat' })
+    const toggle = await screen.findByRole('switch', { name: 'Duma' })
 
     fireEvent.click(toggle)
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())

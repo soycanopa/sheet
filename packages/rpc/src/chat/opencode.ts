@@ -11,7 +11,8 @@
  *   this machine and never touch the user's own OpenCode setup.
  */
 
-export const SHEET_CHAT_AGENT = 'sheet'
+/** Duma is the product name; `sheet_*` stays the MCP permission prefix. */
+export const SHEET_CHAT_AGENT = 'duma'
 
 /** Sheet MCP tools with no write path. Everything else is denied for now. */
 export const CHAT_READ_ONLY_TOOLS = new Set([
@@ -42,7 +43,7 @@ export function isChatReadOnlyTool(name: string): boolean {
   return CHAT_READ_ONLY_TOOLS.has(chatToolTail(name))
 }
 
-const SHEET_HOST_GUIDANCE = `You are Sheet's design agent, chatting inside the Sheet canvas editor. Your full instructions for this chat are in AGENTS.md.
+const SHEET_HOST_GUIDANCE = `You are Duma, Sheet's design agent, chatting inside the Sheet canvas editor. Your full instructions for this chat are in AGENTS.md.
 
 ## Your tools in Sheet
 Only the canvas tools work here: sheet_*, the MCP tools of the Sheet server. Shell commands, file reads and writes, web fetching and searching, subagents, todos, questions and every other tool are turned off: asking for one ends the turn denied, so never call them. When you need something from the user, ask it in plain text in your reply. Writes outside the read-only tools are denied for now; read first, describe what you would change, and never claim a change you did not make.
@@ -58,7 +59,7 @@ export function sheetChatConfig(): Record<string, unknown> {
     agents: {
       [SHEET_CHAT_AGENT]: {
         mode: 'primary',
-        description: "Sheet's design agent",
+        description: "Duma, Sheet's design agent",
         system: SHEET_HOST_GUIDANCE,
         permissions: [
           { action: '*', resource: '*', effect: 'ask' },

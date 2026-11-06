@@ -90,13 +90,13 @@ describe('acp framing', () => {
 describe('chat lockdown', () => {
   test('asks everything except the sheet tools', () => {
     const config = sheetChatConfig() as {
-      agents: { sheet: { permissions: { action: string; effect: string }[] } }
+      agents: { duma: { permissions: { action: string; effect: string }[] } }
       default_agent: string
       share: string
     }
-    expect(config.default_agent).toBe('sheet')
+    expect(config.default_agent).toBe('duma')
     expect(config.share).toBe('disabled')
-    expect(config.agents.sheet.permissions).toEqual([
+    expect(config.agents.duma.permissions).toEqual([
       { action: '*', resource: '*', effect: 'ask' },
       { action: 'sheet_*', resource: '*', effect: 'allow' },
     ])

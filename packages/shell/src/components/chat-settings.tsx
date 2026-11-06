@@ -59,14 +59,14 @@ export function InternalChatSettings() {
 
   return (
     <Section
-      label="Internal chat"
-      hint="Work the canvas with an agent that runs here, on this Mac, through your OpenCode models. It reads your sign-ins and never touches them."
+      label="Duma"
+      hint="Work the canvas with Duma, the agent that runs here, on this Mac, through your OpenCode models. It reads your sign-ins and never touches them."
       value={enabled ? 'On' : 'Off'}
     >
       <div className="flex items-center justify-between gap-4">
         <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">Takes effect immediately.</p>
         <Switch
-          aria-label="Internal chat"
+          aria-label="Duma"
           checked={enabled}
           onCheckedChange={(next) => save({ enabled: next, side, mode })}
           className="shrink-0"
