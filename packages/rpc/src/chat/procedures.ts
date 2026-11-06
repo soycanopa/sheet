@@ -100,14 +100,14 @@ export const getChatHistory = localProcedure
   .input(z.object({ sessionId: z.string().min(1).max(128) }))
   .handler(async ({ context, input }) => {
     await requireChatEnabled(context.user.id)
-    return { transcript: chatManager.history(input.sessionId) }
+    return { transcript: await chatManager.history(input.sessionId) }
   })
 
 export const listChats = localProcedure
   .input(z.object({ designId: z.string().min(1).max(128) }))
   .handler(async ({ context, input }) => {
     await requireChatEnabled(context.user.id)
-    return { sessions: chatManager.list(input.designId) }
+    return { sessions: await chatManager.list(input.designId) }
   })
 
 export const getChat = localProcedure

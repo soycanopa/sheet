@@ -1,5 +1,7 @@
-import { LOCAL_USER_ID } from '@sheet/db'
+import { LOCAL_USER_ID, db } from '@sheet/db'
+import { chatSession } from '@sheet/db/schema'
 import { publishLocalEvent } from '@sheet/realtime/local-bus'
+import { desc, eq } from 'drizzle-orm'
 import type { SessionUpdate } from './acp-client'
 import { CHAT_EFFORT_LEVELS, chatEffortCandidates, chatSourceName, isChatReadOnlyTool, summarizeChatModels, type ChatModelEntry } from './opencode'
 import { locateOpenCodeCli, startOpenCodeSession, waitForListedTools, type StartedSession } from './opencode-session'
@@ -49,6 +51,27 @@ export interface ChatSessionSummary {
 
 const MAX_TRANSCRIPT = 200
 const TURN_TIMEOUT_MS = 300_000
+
+/** Rows are written by us, but parse defensively — a hand-edited DB must not break the rail. */
+function parseTranscript(raw: string): ChatMessage[] {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(
+        (entry): entry is ChatMessage =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          ((entry as { role?: unknown }).role === 'user' ||
+            (entry as { role?: unknown }).role === 'agent' ||
+            (entry as { role?: unknown }).role === 'tool') &&
+          typeof (entry as { text?: unknown }).text === 'string',
+      )
+      .slice(-MAX_TRANSCRIPT)
+  } catch {
+    return []
+  }
+}
 
 function delta(
   session: ManagedSession,
@@ -167,6 +190,90 @@ class ChatManager {
     }
   }
 
+  /** Best-effort write-through: a failed save never fails the turn. */
+  private persist(session: ManagedSession): void {
+    const values = {
+      id: session.id,
+      designId: session.designId,
+      model: session.model,
+      effort: session.effort,
+      preview: session.preview,
+      transcript: JSON.stringify(session.transcript.slice(-MAX_TRANSCRIPT)),
+      updatedAt: new Date(session.updatedAt),
+    }
+    void (async () => {
+      try {
+        await db.insert(chatSession).values(values).onConflictDoUpdate({
+          target: chatSession.id,
+          set: {
+            designId: values.designId,
+            model: values.model,
+            effort: values.effort,
+            preview: values.preview,
+            transcript: values.transcript,
+            updatedAt: values.updatedAt,
+          },
+        })
+      } catch (error) {
+        console.error('[chat] session persist failed:', error instanceof Error ? error.message : error)
+      }
+    })()
+  }
+
+  private forget(id: string): void {
+    void (async () => {
+      try {
+        await db.delete(chatSession).where(eq(chatSession.id, id))
+      } catch (error) {
+        console.error('[chat] session delete failed:', error instanceof Error ? error.message : error)
+      }
+    })()
+  }
+
+  /**
+   * A restart orphans the agent process but not the thread: respawn OpenCode
+   * around the stored transcript so a reopened chat keeps its history and
+   * stays usable.
+   */
+  private async restore(id: string): Promise<ManagedSession> {
+    const [row] = await db.select().from(chatSession).where(eq(chatSession.id, id)).limit(1)
+    if (!row) throw new Error('Unknown chat session.')
+    const cli = await this.cli()
+    if (!cli) throw new Error('OpenCode is not installed on this machine.')
+    const session: ManagedSession = {
+      id: row.id,
+      designId: row.designId,
+      started: null as never,
+      model: row.model,
+      effort: row.effort,
+      appliedModel: null,
+      appliedEffort: null,
+      busy: false,
+      seq: 0,
+      transcript: parseTranscript(row.transcript),
+      currentText: '',
+      listedTools: false,
+      listedAt: Date.now(),
+      preview: row.preview,
+      updatedAt: row.updatedAt.getTime(),
+    }
+    const url = `http://127.0.0.1:${mcpPort()}/mcp`
+    session.started = await startOpenCodeSession({
+      cli,
+      designId: session.designId,
+      mcpServers: [{ type: 'http', name: 'sheet', url, headers: [] }],
+      onUpdate: (acpSessionId, update) => this.onUpdate(session, acpSessionId, update),
+      onServerRequest: (method, params) => this.onServerRequest(session, method, params),
+      onStderr: () => undefined,
+    })
+    this.sessions.set(id, session)
+    return session
+  }
+
+  private async live(id: string): Promise<ManagedSession> {
+    return this.sessions.get(id) ?? this.restore(id)
+  }
+
   async start(designId: string, opts: { model?: string; effort?: string }): Promise<ChatSessionView> {
     const cli = await this.cli()
     if (!cli) throw new Error('OpenCode is not installed on this machine.')
@@ -200,6 +307,7 @@ class ChatManager {
     })
     this.sessions.set(id, session)
     await this.applyConfig(session)
+    this.persist(session)
     return this.view(session)
   }
 
@@ -300,8 +408,7 @@ class ChatManager {
   }
 
   async send(id: string, text: string, opts: { model?: string; effort?: string }): Promise<{ accepted: boolean }> {
-    const session = this.sessions.get(id)
-    if (!session) throw new Error('Unknown chat session.')
+    const session = await this.live(id)
     if (session.busy) throw new Error('The chat is already working on a turn.')
     if (opts.model !== undefined) session.model = opts.model
     if (opts.effort !== undefined) session.effort = opts.effort
@@ -310,6 +417,7 @@ class ChatManager {
     pushTranscript(session, { role: 'user', text: text.slice(0, 20_000) })
     if (!session.preview) session.preview = text.slice(0, 60)
     session.updatedAt = Date.now()
+    this.persist(session)
     void this.runTurn(session, text).finally(() => {
       session.busy = false
     })
@@ -348,50 +456,68 @@ class ChatManager {
       delta(session, 'error', { message: message.slice(0, 500) })
     } finally {
       session.updatedAt = Date.now()
+      this.persist(session)
     }
   }
 
-  list(designId: string): ChatSessionSummary[] {
-    return [...this.sessions.values()]
-      .filter((session) => session.designId === designId)
-      .map((session) => ({
+  async list(designId: string): Promise<ChatSessionSummary[]> {
+    const stored = await db
+      .select()
+      .from(chatSession)
+      .where(eq(chatSession.designId, designId))
+      .orderBy(desc(chatSession.updatedAt))
+    const summaries = new Map<string, ChatSessionSummary>()
+    for (const row of stored) {
+      summaries.set(row.id, {
+        id: row.id,
+        designId: row.designId,
+        preview: row.preview || 'New chat',
+        updatedAt: row.updatedAt.getTime(),
+        busy: false,
+      })
+    }
+    // Live sessions win: they carry the current busy flag and preview.
+    for (const session of this.sessions.values()) {
+      if (session.designId !== designId) continue
+      summaries.set(session.id, {
         id: session.id,
         designId: session.designId,
         preview: session.preview || 'New chat',
         updatedAt: session.updatedAt,
         busy: session.busy,
-      }))
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+      })
+    }
+    return [...summaries.values()].sort((a, b) => b.updatedAt - a.updatedAt)
   }
 
-  getView(id: string): ChatSessionView {
-    const session = this.sessions.get(id)
-    if (!session) throw new Error('Unknown chat session.')
-    return this.view(session)
+  async getView(id: string): Promise<ChatSessionView> {
+    return this.view(await this.live(id))
   }
 
   async cancel(id: string): Promise<{ cancelled: boolean }> {
-    const session = this.sessions.get(id)
-    if (!session) throw new Error('Unknown chat session.')
+    const session = await this.live(id)
     session.started.acp.notify('session/cancel', { sessionId: session.started.sessionId })
     return { cancelled: true }
   }
 
-  history(id: string): ChatMessage[] {
-    const session = this.sessions.get(id)
-    if (!session) throw new Error('Unknown chat session.')
-    return [...session.transcript]
+  async history(id: string): Promise<ChatMessage[]> {
+    return [...(await this.live(id)).transcript]
   }
 
   close(id: string): { closed: boolean } {
     const session = this.sessions.get(id)
-    if (!session) return { closed: false }
+    if (!session) {
+      // Already gone from memory — still drop the stored row, if any.
+      this.forget(id)
+      return { closed: false }
+    }
     this.sessions.delete(id)
     try {
       session.started.close()
     } catch {
       // Already gone — nothing to stop.
     }
+    this.forget(id)
     return { closed: true }
   }
 }
