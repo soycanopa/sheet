@@ -155,14 +155,19 @@ export function ChatFloating({
     })()
   }
 
-  const onResizePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  /**
+   * The window sits in the bottom-left corner, so it grows up and right:
+   * the top edge pulls the height, the right edge the width, and the
+   * top-right corner both at once.
+   */
+  const startResize = (mode: 'top' | 'right' | 'corner') => (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     event.preventDefault()
     const origin = { x: event.clientX, y: event.clientY, w: size.w, h: size.h }
     const onMove = (move: PointerEvent) => {
       setSize({
-        w: Math.max(FLOAT_MIN_W, Math.round(origin.w + move.clientX - origin.x)),
-        h: Math.max(FLOAT_MIN_H, Math.round(origin.h + move.clientY - origin.y)),
+        w: mode === 'top' ? origin.w : Math.max(FLOAT_MIN_W, Math.round(origin.w + move.clientX - origin.x)),
+        h: mode === 'right' ? origin.h : Math.max(FLOAT_MIN_H, Math.round(origin.h - (move.clientY - origin.y))),
       })
     }
     const onUp = () => {
@@ -260,13 +265,29 @@ export function ChatFloating({
       </div>
       <div
         role="separator"
+        aria-label="Resize chat height"
+        aria-orientation="horizontal"
+        title="Drag to resize height"
+        onPointerDown={startResize('top')}
+        className="absolute inset-x-0 top-0 z-10 h-1.5 cursor-ns-resize touch-none outline-none hover:bg-cx-accent/20 focus-visible:bg-cx-accent/20"
+      />
+      <div
+        role="separator"
+        aria-label="Resize chat width"
+        aria-orientation="vertical"
+        title="Drag to resize width"
+        onPointerDown={startResize('right')}
+        className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-ew-resize touch-none outline-none hover:bg-cx-accent/20 focus-visible:bg-cx-accent/20"
+      />
+      <div
+        role="separator"
         aria-label="Resize chat"
         aria-orientation="horizontal"
-        title="Resize"
-        onPointerDown={onResizePointerDown}
-        className="absolute bottom-0.5 right-0.5 z-10 size-5 cursor-nwse-resize touch-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        title="Drag to resize"
+        onPointerDown={startResize('corner')}
+        className="absolute right-0 top-0 z-10 size-2.5 cursor-nesw-resize touch-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <span aria-hidden="true" className="absolute bottom-1 right-1 block h-2.5 w-2.5 rounded-br border-b-2 border-r-2 border-muted-foreground/70" />
+        <span aria-hidden="true" className="absolute right-0.5 top-0.5 block h-2 w-2 rounded-tr border-r-2 border-t-2 border-muted-foreground/70" />
       </div>
     </div>
   )

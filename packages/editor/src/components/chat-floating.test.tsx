@@ -70,18 +70,36 @@ describe('ChatFloating', () => {
     expect(await screen.findByText('Hello Duma')).toBeTruthy()
   })
 
-  test('resizes from the corner handle and remembers the size', async () => {
+  test('resizes from the top-right corner and remembers the size', async () => {
     render(<ChatFloating designId="design-1" open={true} onOpenChange={() => undefined} />)
     await screen.findByText('Chats')
     const window_ = screen.getByTestId('chat-float-window')
     expect(window_.style.width).toBe('560px')
     const handle = screen.getByRole('separator', { name: 'Resize chat' })
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 200 })
-    fireEvent.pointerMove(window, { clientX: 260, clientY: 240 })
+    fireEvent.pointerMove(window, { clientX: 260, clientY: 160 })
     fireEvent.pointerUp(window)
     expect(window_.style.width).toBe('620px')
     expect(window_.style.height).toBe('520px')
     expect(window.localStorage.getItem('sheet:chat-float-size')).toBe('{"w":620,"h":520}')
+  })
+
+  test('grows upward from the top edge and rightward from the side', async () => {
+    render(<ChatFloating designId="design-1" open={true} onOpenChange={() => undefined} />)
+    await screen.findByText('Chats')
+    const window_ = screen.getByTestId('chat-float-window')
+    const top = screen.getByRole('separator', { name: 'Resize chat height' })
+    fireEvent.pointerDown(top, { button: 0, clientX: 200, clientY: 200 })
+    fireEvent.pointerMove(window, { clientX: 200, clientY: 150 })
+    fireEvent.pointerUp(window)
+    expect(window_.style.height).toBe('530px')
+    expect(window_.style.width).toBe('560px')
+    const side = screen.getByRole('separator', { name: 'Resize chat width' })
+    fireEvent.pointerDown(side, { button: 0, clientX: 200, clientY: 200 })
+    fireEvent.pointerMove(window, { clientX: 260, clientY: 200 })
+    fireEvent.pointerUp(window)
+    expect(window_.style.width).toBe('620px')
+    expect(window_.style.height).toBe('530px')
   })
 
   test('collapses from the header control', async () => {
